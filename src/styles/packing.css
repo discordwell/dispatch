@@ -223,6 +223,35 @@
   font-weight: 700;
   color: var(--brass-0);
 }
+.tray-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: 56vh;
+  padding-right: 2px;
+}
+/* per-destination header in the manifest (color matches the pieces bound there) */
+.tray-dest {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--parch-ink-soft);
+}
+.tray-dest:first-child {
+  margin-top: 0;
+}
+.tray-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1px solid rgba(20, 14, 8, 0.5);
+  flex: none;
+}
 
 .pack-foot {
   display: flex;

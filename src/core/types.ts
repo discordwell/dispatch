@@ -56,27 +56,41 @@ export interface ShipClass {
   holdH: number;
 }
 
+// 'repositioning' is reserved (nothing sets it yet — deadheading is a real pickup stop now).
 export type ShipStatus = 'idle' | 'loading' | 'flying' | 'repositioning';
 
+/** One stop on a multi-stop route: a dock the ship reaches at a known time. */
+export interface RouteStop {
+  cityId: CityId;
+  pos: Vec2; // dock position, denormalized so geometry needs no dock lookup
+  arriveAtMs: number; // absolute clock time the ship reaches this stop
+}
+
 export interface Route {
-  /** Origin city, or null when departing a free map point (NPC repositioning). */
+  /** Loading dock the trip began at, or null when departing a free map point (charter spawn). */
   originId: CityId | null;
-  destId: CityId;
   from: Vec2;
-  /** Optional pickup waypoint: the ship deadheads here (the request origin) before the load leg. */
-  via?: Vec2;
-  to: Vec2;
+  /** Ordered delivery stops; the last is the final dock where the ship idles. */
+  stops: RouteStop[];
+  /** First not-yet-reached stop; equals stops.length once every stop has been delivered. */
+  nextStopIndex: number;
   departedAtMs: number;
-  arriveAtMs: number;
+  arriveAtMs: number; // == stops.at(-1).arriveAtMs (whole-trip end)
   purpose: 'deliver' | 'reposition';
 }
 
-/** Cargo committed to a ship and carried in flight. */
-export interface CargoManifest {
+/** One request's contribution to a combined hold, auto-unloaded at its destination dock. */
+export interface CargoLot {
   requestId: string;
-  placements: Placement[];
-  items: PolyominoItem[]; // the subset actually loaded
-  payout: number; // net payout credited on arrival
+  destId: CityId;
+  items: PolyominoItem[]; // the subset of this request actually loaded
+  payout: number; // this lot's net share, credited when the ship reaches destId
+}
+
+/** The combined contents of a ship's hold: one or more lots packed into a single grid. */
+export interface Hold {
+  placements: Placement[]; // all placed pieces across every lot (whole-hold geometry)
+  lots: CargoLot[];
 }
 
 export interface Airship {
@@ -89,11 +103,12 @@ export interface Airship {
   status: ShipStatus;
   /** Set when idle/loading at a city. */
   locationId: CityId | null;
-  /** Free-map position; authoritative while flying/repositioning, else mirrors the city. */
+  /** Free-map position; authoritative while flying/repositioning, else mirrors the dock. */
   pos: Vec2;
   route?: Route;
-  assignedRequestId?: string;
-  cargo?: CargoManifest;
+  /** Dock whose orders are on offer; set while status === 'loading'. */
+  loadingDockId?: CityId;
+  hold?: Hold;
 }
 
 export type RequestStatus = 'scheduled' | 'active' | 'assigned' | 'delivered' | 'expired';

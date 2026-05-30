@@ -51,14 +51,19 @@ export class ShipInspector {
       ['Hold', `${ship.holdW} × ${ship.holdH}`],
     ];
     if (ship.status === 'flying' && ship.route) {
-      rows.push(['Destination', nameOf(ship.route.destId)]);
-      rows.push(['ETA', formatCountdown(ship.route.arriveAtMs - s.clockMs)]);
-      if (ship.cargo) {
-        rows.push(['Cargo', `${ship.cargo.items.length} items`]);
-        rows.push(['Payout on arrival', formatMoney(ship.cargo.payout)]);
+      const route = ship.route;
+      const remaining = route.stops.slice(route.nextStopIndex);
+      rows.push(['Stops', remaining.map((st) => nameOf(st.cityId)).join(' → ') || '—']);
+      const next = remaining[0];
+      if (next) rows.push(['Next ETA', formatCountdown(next.arriveAtMs - s.clockMs)]);
+      if (ship.hold) {
+        const itemCount = ship.hold.lots.reduce((n, l) => n + l.items.length, 0);
+        const remainingPay = ship.hold.lots.reduce((a, l) => a + l.payout, 0);
+        rows.push(['Cargo', `${itemCount} item${itemCount === 1 ? '' : 's'}`]);
+        rows.push(['Payout remaining', formatMoney(remainingPay)]);
       }
     } else {
-      rows.push(['Location', nameOf(ship.locationId)]);
+      rows.push(['Location', nameOf(ship.loadingDockId ?? ship.locationId)]);
     }
     if (!ship.owned) rows.push(['Booking fee', `${Math.round(ship.feeFraction * 100)}%`]);
 

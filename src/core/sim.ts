@@ -1,6 +1,6 @@
 import { config } from '../config';
 import { SHIP_CLASSES } from '../data/ships';
-import { pathPosition, routeProgress } from './geometry';
+import { polylinePosition, routePolyline, routeProgress } from './geometry';
 import { makeRng, pick } from './rng';
 import type { Airship, GameState, NpcOffer } from './types';
 
@@ -80,13 +80,13 @@ export function step(s: GameState, dtMs: number): void {
     s.nextNpcRefreshMs += config.NPC_OFFER_REFRESH_MS;
   }
 
-  // Move ships and resolve arrivals.
+  // Move ships and resolve any stops reached this tick.
   for (const ship of s.ships) {
     const route = ship.route;
     if (!route || (ship.status !== 'flying' && ship.status !== 'repositioning')) continue;
     const t = routeProgress(route.departedAtMs, route.arriveAtMs, now);
-    ship.pos = pathPosition(route.from, route.via, route.to, t);
-    if (now >= route.arriveAtMs) arrive(s, ship);
+    ship.pos = polylinePosition(routePolyline(route.from, route.stops), t);
+    advanceStops(s, ship, now);
   }
 
   // Booked charters are one-delivery: once they finish (idle, no route), they depart.
@@ -102,22 +102,45 @@ export function step(s: GameState, dtMs: number): void {
   }
 }
 
-function arrive(s: GameState, ship: Airship): void {
+/**
+ * Resolve every route stop reached since the last tick. A fast ship + large dt can pass
+ * several stops at once, so we loop: at each stop, auto-unload the lots due there (credit
+ * the payout, mark the request delivered, emit one deliver event), advancing a cursor that
+ * never mutates the stop list (so the position calc keeps using the full polyline). When
+ * the final stop is reached the ship idles there and the trip is cleared.
+ */
+function advanceStops(s: GameState, ship: Airship, now: number): void {
   const route = ship.route;
   if (!route) return;
 
-  if (route.purpose === 'deliver' && ship.cargo) {
-    s.earnings += ship.cargo.payout;
-    s.events.push({ type: 'deliver', cityId: route.destId, amount: ship.cargo.payout });
-    const req = s.requests.find((r) => r.id === ship.cargo?.requestId);
-    if (req) req.status = 'delivered';
+  while (route.nextStopIndex < route.stops.length && route.stops[route.nextStopIndex]!.arriveAtMs <= now) {
+    const stop = route.stops[route.nextStopIndex]!;
+    route.nextStopIndex++;
+
+    if (ship.hold) {
+      let dropped = 0;
+      for (const lot of ship.hold.lots) {
+        if (lot.destId !== stop.cityId) continue;
+        s.earnings += lot.payout;
+        dropped += lot.payout;
+        const req = s.requests.find((r) => r.id === lot.requestId);
+        if (req) req.status = 'delivered';
+      }
+      ship.hold.lots = ship.hold.lots.filter((l) => l.destId !== stop.cityId);
+      // suppress 0-payout events (e.g. the non-crediting pickup stop)
+      if (dropped > 0) s.events.push({ type: 'deliver', cityId: stop.cityId, amount: dropped });
+    }
   }
 
-  const dest = s.cities.find((c) => c.id === route.destId);
-  ship.status = 'idle';
-  ship.locationId = route.destId;
-  if (dest) ship.pos = { x: dest.x, y: dest.y };
-  delete ship.route;
-  delete ship.cargo;
-  delete ship.assignedRequestId;
+  if (route.nextStopIndex >= route.stops.length) {
+    const last = route.stops[route.stops.length - 1];
+    ship.status = 'idle';
+    if (last) {
+      ship.locationId = last.cityId;
+      const city = s.cities.find((c) => c.id === last.cityId);
+      ship.pos = city ? { x: city.x, y: city.y } : { x: last.pos.x, y: last.pos.y };
+    }
+    delete ship.route;
+    delete ship.hold;
+  }
 }

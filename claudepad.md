@@ -7,6 +7,17 @@ Newest session summaries on top (keep 20; overflow → `oldpad.md`). Key Finding
 
 ## Session Summaries
 
+### 2026-05-30T22:51Z — City-map background + multi-load milk-run
+- User asks: use the downloaded **Zybourne City** map as the background with **docks** instead of cities, and **pick up multiple loads per trip**. Plan: `~/.claude/plans/synthetic-swinging-thompson.md`. 75 vitest tests green, build clean, hard wet-tested live, redeployed.
+- **Map + docks:** `src/assets/zybourne-city.png` (765×600, GIF→PNG) drawn by `paintCityMap` inside the brass frame; `MapRenderer.knockOutWhiteBackground` flood-fills the GIF's white surround → transparent so the sepia ground shows. config `MAP_W/H=765/600`, `SHIP_SPEED 78→60`. `cities.ts` is now 12 **docks** across the map districts (hub = `loading-bay`); `level1..5` cityIds updated. Internal type stays `City`/`cityId` (deliberate — a "city" now models a dock).
+- **Multi-load "running milk-run":** load any orders from the dock a ship sits on into ONE hold → ship flies a multi-stop nearest-neighbour route → **auto-unloads** each order at its destination → idles at the final drop (chain the next load there). A non-crediting **pickup stop** is prepended when the ship isn't at the dock (deadhead-to-collect), so any idle ship can load any dock and charters fly in.
+  - types: `Route{stops:RouteStop[], nextStopIndex}` (removed via/to/destId); `CargoLot`+`Hold` (removed CargoManifest); `Airship.hold`/`loadingDockId` (removed cargo/assignedRequestId).
+  - geometry: `cumulativeLengths`/`polylinePosition`/`routePolyline` (removed pathLength/pathPosition).
+  - actions: `beginLoad`/`commitLoad`/`cancelLoad`, `splitNet` (proportional payout, sums to net), `buildMilkRun`, `bookNpc(dockId)`; `autoAssign` kept as a 1-request shim so the headless balance tests hold.
+  - sim: `advanceStops` credits each crossed stop exactly once (one deliver event/stop), idles at the last stop. UI: dock-scoped PackingOverlay (tray grouped+colored by destination, "Drops" readout), one dock-level Load action in RequestBoard, ShipInspector lists stops, MapRenderer draws the multi-stop polyline.
+- **/code-review (no Critical) — fixed with tests:** degenerate dest==dock excluded (avoids pickup/delivery collision); `commitLoad` drops stale/taken items + dispatches the remainder (two-ship-same-dock race) instead of rejecting wholesale; GameUI cancels a failed commit so a ship is never stranded `loading`; `SHIP_SPEED>0` guard. Deferred minor: dead `repositioning`/`reposition` plumbing (commented reserved).
+- Loading does NOT freeze the board (matches "time never pauses"); the overlay self-heals expired orders. Thresholds unchanged; balance still passes on the smaller map.
+
 ### 2026-05-30T23:10Z — Full game build-out (post-slice)
 - Goal from user: "continue to build the entire game end to end." Built the complete game on top
   of the deployed slice (57 vitest tests green; build clean; hard wet-tested in browser):

@@ -1,30 +1,32 @@
 import type { City, CityId } from '../core/types';
 
 /**
- * The city catalog — a superset across all levels. Coordinates are in map units
- * (config.MAP_W × MAP_H ≈ 1000×680), kept off the edges. Each level picks a subset
- * via LevelConfig.cityIds. Names lean into the Zybourne Clock's brass/clock world.
+ * The dock catalog — a superset across all levels. A `City` now models a DOCK
+ * inside Zybourne City (the fiction is intra-city dispatch). Coordinates are in
+ * map units == pixels of the city map (config.MAP_W × MAP_H = 765 × 600), placed
+ * over the map's districts. Each level picks a subset via LevelConfig.cityIds;
+ * the first id is the fleet's home dock. Names lean into the map's districts.
  */
 export const CITIES: readonly City[] = [
-  { id: 'zybourne', name: 'Zybourne', x: 500, y: 338 }, // central hub — fleet home
-  { id: 'clockhaven', name: 'Clockhaven', x: 322, y: 250 },
-  { id: 'tickmoor', name: 'Tickmoor', x: 690, y: 246 },
-  { id: 'nimbus-wharf', name: 'Nimbus Wharf', x: 498, y: 104 },
-  { id: 'aetherhaven', name: 'Aetherhaven', x: 168, y: 138 },
-  { id: 'brassholm', name: 'Brassholm', x: 836, y: 150 },
-  { id: 'cogsworth', name: 'Cogsworth', x: 150, y: 470 },
-  { id: 'gearford', name: 'Gearford', x: 852, y: 498 },
-  { id: 'sprocket-bay', name: 'Sprocket Bay', x: 318, y: 576 },
-  { id: 'mainspring', name: 'Mainspring', x: 706, y: 596 },
-  { id: 'escapement', name: 'Escapement', x: 918, y: 332 },
-  { id: 'fiveaces-landing', name: 'Fiveaces Landing', x: 110, y: 318 },
+  { id: 'loading-bay', name: 'Loading Bay', x: 370, y: 455 }, // the harbor docks — fleet home
+  { id: 'clocktower-plaza', name: 'Clocktower Plaza', x: 370, y: 285 }, // central crossroads
+  { id: 'the-slums', name: 'The Slums', x: 150, y: 300 },
+  { id: 'commercial-quay', name: 'Commercial Quay', x: 105, y: 405 },
+  { id: 'uptown-heights', name: 'Uptown Heights', x: 135, y: 50 },
+  { id: 'cog-junction', name: 'Cog Junction', x: 320, y: 115 },
+  { id: 'garrison-keep', name: 'Garrison Keep', x: 560, y: 210 }, // Castle/Military District
+  { id: 'sprocket-row', name: 'Sprocket Row', x: 645, y: 330 },
+  { id: 'gearford-wall', name: 'Gearford Wall', x: 560, y: 440 },
+  { id: 'brass-gate', name: 'Brass Gate', x: 710, y: 250 }, // east perimeter gate
+  { id: 'aether-pier', name: 'Aether Pier', x: 490, y: 505 }, // harbor, east of the loading bay
+  { id: 'tinkers-end', name: "Tinker's End", x: 55, y: 320 }, // far-west edge
 ] as const;
 
 const BY_ID = new Map<CityId, City>(CITIES.map((c) => [c.id, c]));
 
 export function getCity(id: CityId): City {
   const c = BY_ID.get(id);
-  if (!c) throw new Error(`Unknown city: ${id}`);
+  if (!c) throw new Error(`Unknown dock: ${id}`);
   return c;
 }
 

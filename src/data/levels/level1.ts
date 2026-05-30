@@ -1,7 +1,7 @@
 import type { LevelConfig } from '../../core/types';
 
 /**
- * Level 1 — ♠ "The Morning Mail". Tutorialish: one Hauler, eight cities, gentle
+ * Level 1 — ♠ "The Morning Mail". Tutorialish: one Hauler, eight docks, gentle
  * shapes (tiers 1–2), generous expiries, a forgiving threshold. The concrete,
  * tuned level; 2–5 escalate purely via data.
  */
@@ -12,14 +12,14 @@ export const level1: LevelConfig = {
   durationMs: 600_000,
   threshold: 4500, // ~40% of the single-ship ceiling — a gentle ace-1 goal (packing-time model)
   cityIds: [
-    'zybourne',
-    'clockhaven',
-    'tickmoor',
-    'nimbus-wharf',
-    'aetherhaven',
-    'brassholm',
-    'cogsworth',
-    'gearford',
+    'loading-bay',
+    'the-slums',
+    'commercial-quay',
+    'uptown-heights',
+    'clocktower-plaza',
+    'garrison-keep',
+    'cog-junction',
+    'aether-pier',
   ],
   ownedShips: [{ shipClass: 'Hauler' }],
   npc: { enabled: true, feeFraction: 0.3, spawnDistance: 150 },

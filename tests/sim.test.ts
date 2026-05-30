@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { step } from '../src/core/sim';
 import { createGameState } from '../src/core/setup';
-import { autoAssign, activeRequests, idleShips } from '../src/state/actions';
+import { autoAssign, activeRequests, beginLoad, idleShips } from '../src/state/actions';
 import type { Airship, DeliveryRequest, GameState, LevelConfig } from '../src/core/types';
 
 const baseConfig: LevelConfig = {
@@ -60,15 +60,60 @@ function flyingShip(payout: number, arriveAtMs: number): Airship {
     pos: { x: 0, y: 0 },
     route: {
       originId: 'a',
-      destId: 'b',
       from: { x: 0, y: 0 },
-      to: { x: 100, y: 0 },
+      stops: [{ cityId: 'b', pos: { x: 100, y: 0 }, arriveAtMs }],
+      nextStopIndex: 0,
       departedAtMs: 0,
       arriveAtMs,
       purpose: 'deliver',
     },
-    cargo: { requestId: 'r1', placements: [], items: [], payout },
+    hold: { placements: [], lots: [{ requestId: 'r1', destId: 'b', items: [], payout }] },
   };
+}
+
+/** A ship mid-milk-run with two lots dropping at 'a' (t=1000) then 'b' (t=stopBArriveAtMs). */
+function twoStopState(stopBArriveAtMs = 2000): GameState {
+  const ship: Airship = {
+    id: 's1',
+    shipClass: 'Hauler',
+    owned: true,
+    feeFraction: 0,
+    holdW: 5,
+    holdH: 6,
+    status: 'flying',
+    locationId: null,
+    pos: { x: 0, y: 0 },
+    route: {
+      originId: 'd',
+      from: { x: 0, y: 0 },
+      stops: [
+        { cityId: 'a', pos: { x: 100, y: 0 }, arriveAtMs: 1000 },
+        { cityId: 'b', pos: { x: 200, y: 0 }, arriveAtMs: stopBArriveAtMs },
+      ],
+      nextStopIndex: 0,
+      departedAtMs: 0,
+      arriveAtMs: stopBArriveAtMs,
+      purpose: 'deliver',
+    },
+    hold: {
+      placements: [],
+      lots: [
+        { requestId: 'r1', destId: 'a', items: [], payout: 100 },
+        { requestId: 'r2', destId: 'b', items: [], payout: 200 },
+      ],
+    },
+  };
+  return baseState({
+    cities: [
+      { id: 'a', name: 'A', x: 100, y: 0 },
+      { id: 'b', name: 'B', x: 200, y: 0 },
+    ],
+    ships: [ship],
+    requests: [
+      { id: 'r1', originId: 'd', destId: 'a', items: [], spawnAtMs: 0, expiresAtMs: 999_999, status: 'assigned', baseReward: 100 },
+      { id: 'r2', originId: 'd', destId: 'b', items: [], spawnAtMs: 0, expiresAtMs: 999_999, status: 'assigned', baseReward: 200 },
+    ],
+  });
 }
 
 describe('sim.step', () => {
@@ -179,6 +224,75 @@ describe('sim.step', () => {
     });
     step(exp, 1500);
     expect(exp.events).toContainEqual({ type: 'expire', cityId: 'a' });
+  });
+});
+
+describe('multi-stop milk-run', () => {
+  it('credits each stop once, in order, and idles at the final dock', () => {
+    const s = twoStopState();
+    const ship = s.ships[0]!;
+    step(s, 1000); // reach 'a'
+    expect(s.earnings).toBe(100);
+    expect(s.requests.find((r) => r.id === 'r1')!.status).toBe('delivered');
+    expect(s.requests.find((r) => r.id === 'r2')!.status).toBe('assigned');
+    expect(ship.status).toBe('flying');
+    expect(ship.route!.nextStopIndex).toBe(1);
+    expect(s.events.filter((e) => e.type === 'deliver')).toHaveLength(1);
+
+    step(s, 1000); // reach 'b'
+    expect(s.earnings).toBe(300);
+    expect(s.requests.find((r) => r.id === 'r2')!.status).toBe('delivered');
+    expect(ship.status).toBe('idle');
+    expect(ship.locationId).toBe('b');
+    expect(ship.route).toBeUndefined();
+    expect(ship.hold).toBeUndefined();
+
+    step(s, 5000); // no double credit
+    expect(s.earnings).toBe(300);
+  });
+
+  it('credits several stops crossed within a single large dt', () => {
+    const s = twoStopState();
+    step(s, 5000);
+    expect(s.earnings).toBe(300);
+    expect(s.ships[0]!.status).toBe('idle');
+    expect(s.events.filter((e) => e.type === 'deliver')).toHaveLength(2);
+  });
+
+  it('on a trip that overruns the bell, credits only the stops reached and loses the rest', () => {
+    const s = twoStopState(600_500); // second drop is after the shift ends
+    step(s, 600_000);
+    expect(s.earnings).toBe(100); // only the first drop banked
+    expect(s.requests.find((r) => r.id === 'r2')!.status).toBe('assigned'); // never delivered → lost
+    expect(s.outcome).toBe('lost'); // 100 < threshold 1000
+  });
+
+  it('lets an unloaded dock order expire while a ship is loading there', () => {
+    const ship: Airship = {
+      id: 's1',
+      shipClass: 'Hauler',
+      owned: true,
+      feeFraction: 0,
+      holdW: 5,
+      holdH: 6,
+      status: 'idle',
+      locationId: 'd',
+      pos: { x: 0, y: 0 },
+    };
+    const s = baseState({
+      cities: [
+        { id: 'd', name: 'Dock', x: 0, y: 0 },
+        { id: 'a', name: 'A', x: 100, y: 0 },
+      ],
+      ships: [ship],
+      requests: [
+        { id: 'r1', originId: 'd', destId: 'a', items: [], spawnAtMs: 0, expiresAtMs: 1000, status: 'active', baseReward: 100 },
+      ],
+    });
+    expect(beginLoad(s, 'd', 's1')).toBe(true);
+    step(s, 1500); // loading does NOT freeze the board
+    expect(s.requests[0]!.status).toBe('expired');
+    expect(s.events).toContainEqual({ type: 'expire', cityId: 'd' });
   });
 });
 

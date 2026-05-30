@@ -1,9 +1,68 @@
-import { pathPosition, routeProgress } from '../core/geometry';
+import { polylinePosition, routePolyline, routeProgress } from '../core/geometry';
 import type { GameState, Vec2 } from '../core/types';
-import { COL, paintAirship, paintCity, paintParchment, paintRoutePath, paintScreenBackground } from './paint';
+import { COL, paintAirship, paintCity, paintCityMap, paintRoutePath, paintScreenBackground } from './paint';
 import { computeTransform, shipAnchor, type Transform } from './viewport';
 import type { Pick } from './hitTest';
 import { Effects } from './effects';
+import cityMapUrl from '../assets/zybourne-city.png';
+
+/**
+ * Make the map's flat white surround transparent by flood-filling near-white from the
+ * border inward, so the sepia panel shows behind the city instead of a bright rectangle.
+ * Edge-contiguous only → interior white (e.g. the printed district-label fills) is preserved.
+ * Falls back to the raw image if the canvas read fails.
+ */
+function knockOutWhiteBackground(img: HTMLImageElement): CanvasImageSource {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  if (!w || !h) return img;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  if (!ctx) return img;
+  ctx.drawImage(img, 0, 0);
+  let data: ImageData;
+  try {
+    data = ctx.getImageData(0, 0, w, h);
+  } catch {
+    return img; // tainted canvas — shouldn't happen for a same-origin asset
+  }
+  const px = data.data;
+  const visited = new Uint8Array(w * h);
+  const stack: number[] = [];
+  const isWhite = (p: number): boolean => {
+    const i = p * 4;
+    return px[i]! >= 242 && px[i + 1]! >= 242 && px[i + 2]! >= 242 && px[i + 3]! > 0;
+  };
+  const consider = (x: number, y: number): void => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const p = y * w + x;
+    if (visited[p]) return;
+    visited[p] = 1;
+    if (isWhite(p)) stack.push(p);
+  };
+  for (let x = 0; x < w; x++) {
+    consider(x, 0);
+    consider(x, h - 1);
+  }
+  for (let y = 0; y < h; y++) {
+    consider(0, y);
+    consider(w - 1, y);
+  }
+  while (stack.length) {
+    const p = stack.pop()!;
+    px[p * 4 + 3] = 0; // transparent
+    const x = p % w;
+    const y = (p / w) | 0;
+    consider(x + 1, y);
+    consider(x - 1, y);
+    consider(x, y + 1);
+    consider(x, y - 1);
+  }
+  ctx.putImageData(data, 0, 0);
+  return c;
+}
 
 export class MapRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -13,12 +72,22 @@ export class MapRenderer {
   transform: Transform = { scale: 1, ox: 0, oy: 0 };
   selected: Pick | null = null;
   private effects = new Effects();
+  private mapImg: CanvasImageSource | null = null;
+  private mapReady = false;
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2d canvas context unavailable');
     this.ctx = ctx;
     this.resize();
+    // Preload the city-map raster; the rAF loop redraws each frame, so it appears once ready.
+    const img = new Image();
+    img.onload = () => {
+      // Knock out the GIF's flat white surround so the sepia ground shows through the frame.
+      this.mapImg = knockOutWhiteBackground(img);
+      this.mapReady = true;
+    };
+    img.src = cityMapUrl;
   }
 
   resize(): void {
@@ -57,7 +126,7 @@ export class MapRenderer {
     ctx.setTransform(dpr * t.scale, 0, 0, dpr * t.scale, dpr * t.ox, dpr * t.oy);
     ctx.lineCap = 'round';
 
-    paintParchment(ctx);
+    paintCityMap(ctx, this.mapReady ? this.mapImg : null);
 
     // active-request counts (+ urgency) per origin city
     const counts = new Map<string, number>();
@@ -70,13 +139,13 @@ export class MapRenderer {
     }
     const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
 
-    // routes (beneath nodes)
+    // routes (beneath nodes) — the full multi-stop milk-run polyline
     for (const ship of s.ships) {
       const route = ship.route;
       if (!route || (ship.status !== 'flying' && ship.status !== 'repositioning')) continue;
-      const pts: Vec2[] = route.via ? [route.from, route.via, route.to] : [route.from, route.to];
+      const pts = routePolyline(route.from, route.stops);
       const prog = routeProgress(route.departedAtMs, route.arriveAtMs, s.clockMs);
-      paintRoutePath(ctx, pts, pathPosition(route.from, route.via, route.to, prog));
+      paintRoutePath(ctx, pts, polylinePosition(pts, prog));
     }
 
     // bookable charters (faint, tethered to the city they hover near)
@@ -117,9 +186,10 @@ export class MapRenderer {
       let angle = 0;
       const route = ship.route;
       if (route && (ship.status === 'flying' || ship.status === 'repositioning')) {
+        const pts = routePolyline(route.from, route.stops);
         const prog = routeProgress(route.departedAtMs, route.arriveAtMs, s.clockMs);
-        const p0 = pathPosition(route.from, route.via, route.to, Math.max(0, prog - 0.01));
-        const p1 = pathPosition(route.from, route.via, route.to, Math.min(1, prog + 0.01));
+        const p0 = polylinePosition(pts, Math.max(0, prog - 0.01));
+        const p1 = polylinePosition(pts, Math.min(1, prog + 0.01));
         angle = Math.atan2(p1.y - p0.y, p1.x - p0.x);
       }
       paintAirship(ctx, a, angle, {

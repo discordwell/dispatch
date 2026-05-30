@@ -3,7 +3,7 @@ import type { MapRenderer } from '../render/MapRenderer';
 import { createGameState } from '../core/setup';
 import { screenToWorld } from '../render/viewport';
 import { pickAt, type Pick } from '../render/hitTest';
-import { beginPack, bookNpc, cancelPack, commitPack, idleShips, npcOfferNear } from '../state/actions';
+import { beginLoad, bookNpc, cancelLoad, commitLoad, idleShips, npcOfferNear } from '../state/actions';
 import { loadProgress, recordResult } from '../state/progress';
 import { initAudio, isMuted, resumeAudio, sfx, toggleMute } from '../audio';
 import type { GameState, Placement } from '../core/types';
@@ -30,7 +30,7 @@ export class GameUI {
   private title: TitleScreen;
   private begun = false; // false while the title screen is up (sim paused)
   private recorded = false; // guard so a finished shift is persisted once
-  private packing: { reqId: string; shipId: string } | null = null;
+  private loading: { dockId: string; shipId: string } | null = null;
 
   constructor(
     root: HTMLElement,
@@ -39,11 +39,11 @@ export class GameUI {
     private renderer: MapRenderer,
   ) {
     this.hud = new Hud(root);
-    this.board = new RequestBoard(root, (reqId) => this.openPacking(reqId));
+    this.board = new RequestBoard(root, (cityId) => this.openLoading(cityId));
     this.inspector = new ShipInspector(root);
     this.overlay = new PackingOverlay(root, {
-      onCommit: (reqId, shipId, placements) => this.commit(reqId, shipId, placements),
-      onCancel: (reqId, shipId) => this.cancel(reqId, shipId),
+      onCommit: (shipId, placements) => this.commit(shipId, placements),
+      onCancel: (shipId) => this.cancel(shipId),
       onSwitch: (shipId) => this.switchShip(shipId),
     });
     this.result = new ResultOverlay(root, {
@@ -110,7 +110,7 @@ export class GameUI {
     this.result.hide();
     this.selection = null;
     this.renderer.setSelection(null);
-    this.packing = null;
+    this.loading = null;
     this.recorded = false;
     this.begun = true;
     this.store.reset(createGameState(index));
@@ -126,71 +126,78 @@ export class GameUI {
     this.sync();
   }
 
-  /** Reserve a ship (the selected idle ship, else first idle owned, else a charter) and pack. */
-  private openPacking(reqId: string): void {
+  /**
+   * Open the dock's loading puzzle with a ship: the selected idle ship, else an idle owned
+   * ship already at the dock, else any idle owned ship (it deadheads in), else a charter.
+   */
+  private openLoading(cityId: string): void {
     const s = this.store.getState();
     const idle = idleShips(s).filter((sh) => sh.owned);
     const sel = this.selection;
     const selId = sel && sel.type === 'ship' ? sel.id : null;
-    const chosen = idle.find((sh) => sh.id === selId) ?? idle[0];
+    const chosen =
+      idle.find((sh) => sh.id === selId) ?? idle.find((sh) => sh.locationId === cityId) ?? idle[0];
     if (chosen) {
       let ok = false;
       this.store.update((st) => {
-        ok = beginPack(st, reqId, chosen.id);
+        ok = beginLoad(st, cityId, chosen.id);
       });
       if (ok) {
-        this.packing = { reqId, shipId: chosen.id };
-        this.overlay.open(this.store.getState(), reqId, chosen.id);
+        this.loading = { dockId: cityId, shipId: chosen.id };
+        this.overlay.open(this.store.getState(), cityId, chosen.id);
       }
       this.sync();
       return;
     }
-    const req = s.requests.find((r) => r.id === reqId);
-    const offer = req ? npcOfferNear(s, req.originId) : undefined;
+    const offer = npcOfferNear(s, cityId);
     if (offer) {
       let shipId: string | null = null;
       this.store.update((st) => {
-        shipId = bookNpc(st, offer.id, reqId);
+        shipId = bookNpc(st, offer.id, cityId);
       });
       if (shipId) {
-        this.packing = { reqId, shipId };
-        this.overlay.open(this.store.getState(), reqId, shipId);
+        this.loading = { dockId: cityId, shipId };
+        this.overlay.open(this.store.getState(), cityId, shipId);
       }
     }
     this.sync();
   }
 
-  /** Switch which idle owned ship loads the current request (cancel the reservation + re-reserve). */
+  /** Switch which idle owned ship loads at this dock (cancel the reservation + re-reserve). */
   private switchShip(newShipId: string): void {
-    if (!this.packing || this.packing.shipId === newShipId) return;
-    const { reqId, shipId } = this.packing;
+    if (!this.loading || this.loading.shipId === newShipId) return;
+    const { dockId, shipId } = this.loading;
     let ok = false;
     this.store.update((st) => {
-      cancelPack(st, reqId, shipId);
-      ok = beginPack(st, reqId, newShipId);
+      cancelLoad(st, shipId);
+      ok = beginLoad(st, dockId, newShipId);
     });
     if (ok) {
-      this.packing = { reqId, shipId: newShipId };
-      this.overlay.open(this.store.getState(), reqId, newShipId);
+      this.loading = { dockId, shipId: newShipId };
+      this.overlay.open(this.store.getState(), dockId, newShipId);
     }
     this.sync();
   }
 
-  private commit(reqId: string, shipId: string, placements: Placement[]): void {
+  private commit(shipId: string, placements: Placement[]): void {
+    let ok = false;
     this.store.update((st) => {
-      commitPack(st, reqId, shipId, placements);
+      ok = commitLoad(st, shipId, placements);
     });
-    sfx.dispatch();
-    this.packing = null;
+    // A failed commit (e.g. every picked order expired mid-pack) must not strand the ship
+    // in 'loading' with the overlay closed — return it to idle.
+    if (ok) sfx.dispatch();
+    else this.store.update((st) => cancelLoad(st, shipId));
+    this.loading = null;
     this.overlay.close();
     this.sync();
   }
 
-  private cancel(reqId: string, shipId: string): void {
+  private cancel(shipId: string): void {
     this.store.update((st) => {
-      cancelPack(st, reqId, shipId);
+      cancelLoad(st, shipId);
     });
-    this.packing = null;
+    this.loading = null;
     this.overlay.close();
     this.sync();
   }

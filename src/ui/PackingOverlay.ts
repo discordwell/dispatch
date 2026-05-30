@@ -6,7 +6,8 @@ import { sfx } from '../audio';
 import { formatClock, formatMoney } from './format';
 
 const CELL = 40;
-const PIECE_COLORS = ['#c79a2e', '#b9813a', '#9a7414', '#3a7d6e', '#a8632e', '#6f7d33'];
+// Pieces are colored by DESTINATION so the player can see, at a glance, which drop each goes to.
+const DEST_COLORS = ['#c79a2e', '#3a7d6e', '#a8632e', '#6f7d33', '#9a7414', '#b9813a', '#5fae9b', '#a83232'];
 
 interface Held {
   itemId: string;
@@ -15,21 +16,24 @@ interface Held {
 }
 
 export interface PackingCallbacks {
-  onCommit: (requestId: string, shipId: string, placements: Placement[]) => void;
-  onCancel: (requestId: string, shipId: string) => void;
+  onCommit: (shipId: string, placements: Placement[]) => void;
+  onCancel: (shipId: string) => void;
   onSwitch: (shipId: string) => void;
 }
 
 /**
- * The cargo puzzle. Click a manifest piece to pick it up; move over the hold; R/F to
- * rotate/flip; click to place; click a placed piece to lift it again. The sim keeps
- * running underneath — the live clock + "expiring" ticker make dawdling cost you.
+ * The cargo puzzle, now dock-scoped: the tray holds the items of EVERY active order at the
+ * dock, grouped and colored by destination. Pack any subset across orders into one hold;
+ * the ship then milk-runs to each destination, auto-unloading as it goes. Click a manifest
+ * piece to pick it up; move over the hold; R/F rotate/flip; click to place; click a placed
+ * piece to lift it. The sim keeps running underneath — the live clock makes dawdling cost you.
  */
 export class PackingOverlay {
   readonly el: HTMLElement;
   private frame: HTMLElement;
   private shipNameEl: HTMLElement;
   private holdEl: HTMLElement;
+  private trayTitleEl: HTMLElement;
   private shipSelectEl: HTMLElement;
   private clockEl: HTMLElement;
   private expiringEl: HTMLElement;
@@ -42,7 +46,7 @@ export class PackingOverlay {
   private cells: HTMLElement[] = [];
 
   private open_ = false;
-  private requestId = '';
+  private dockId = '';
   private shipId = '';
   private owned = true;
   private fee = 0;
@@ -50,8 +54,11 @@ export class PackingOverlay {
   private h = 0;
   private items: PolyominoItem[] = [];
   private itemMap = new Map<string, PolyominoItem>();
+  private destByItem = new Map<string, string>();
+  private destColor = new Map<string, string>();
+  private nameOf: (id: string) => string = (id) => id;
+  private liveSig = '';
   private placed = new Map<string, Placement>();
-  private colorByItem = new Map<string, string>();
   private held: Held | null = null;
   private pointer = { x: 0, y: 0 };
 
@@ -75,7 +82,7 @@ export class PackingOverlay {
             <div class="pack-grid"><div class="pieces-layer"></div></div>
             <div class="pack-readout"></div>
           </div>
-          <div class="pack-tray"><h3>Manifest</h3><div class="tray-list"></div></div>
+          <div class="pack-tray"><h3 class="tray-title">Manifest</h3><div class="tray-list"></div></div>
         </div>
         <div class="pack-foot">
           <div class="pack-hint">Click a piece · <kbd>R</kbd> rotate · <kbd>F</kbd> flip · <kbd>Esc</kbd> release</div>
@@ -93,6 +100,7 @@ export class PackingOverlay {
     this.frame = el.querySelector('.pack-frame')!;
     this.shipNameEl = el.querySelector('.ship')!;
     this.holdEl = el.querySelector('.hold')!;
+    this.trayTitleEl = el.querySelector('.tray-title')!;
     this.shipSelectEl = el.querySelector('.ship-select')!;
     this.clockEl = el.querySelector('.pack-clock')!;
     this.expiringEl = el.querySelector('.pack-expiring')!;
@@ -110,24 +118,22 @@ export class PackingOverlay {
     return this.open_;
   }
 
-  open(s: GameState, requestId: string, shipId: string): void {
-    const req = s.requests.find((r) => r.id === requestId);
+  open(s: GameState, dockId: string, shipId: string): void {
     const ship = s.ships.find((sh) => sh.id === shipId);
-    if (!req || !ship) return;
-    this.requestId = requestId;
+    if (!ship) return;
+    this.dockId = dockId;
     this.shipId = shipId;
     this.owned = ship.owned;
     this.fee = ship.feeFraction;
     this.w = ship.holdW;
     this.h = ship.holdH;
-    this.items = req.items;
-    this.itemMap = new Map(req.items.map((i) => [i.id, i]));
     this.placed = new Map();
-    this.colorByItem = new Map();
     this.held = null;
+    this.setItemsFrom(s);
 
     this.shipNameEl.textContent = ship.shipClass;
     this.holdEl.textContent = `hold ${this.w} × ${this.h}`;
+    this.trayTitleEl.textContent = `${this.nameOf(dockId)} · manifest`;
     this.renderShipSelect(s, shipId);
     this.buildGrid();
     this.renderAll();
@@ -142,7 +148,22 @@ export class PackingOverlay {
     this.ghostEl.classList.remove('show');
   }
 
-  /** Keep the header clock + expiring ticker live while packing (sim never pauses). */
+  /** Derive the tray from every active order at the dock, colored by destination. */
+  private setItemsFrom(s: GameState): void {
+    this.nameOf = (id) => s.cities.find((c) => c.id === id)?.name ?? id;
+    const reqs = s.requests.filter((r) => r.originId === this.dockId && r.status === 'active');
+    this.items = reqs.flatMap((r) => r.items);
+    this.itemMap = new Map(this.items.map((i) => [i.id, i]));
+    this.destByItem = new Map(reqs.flatMap((r) => r.items.map((i) => [i.id, r.destId] as const)));
+    this.destColor = new Map();
+    let di = 0;
+    for (const r of reqs) {
+      if (!this.destColor.has(r.destId)) this.destColor.set(r.destId, DEST_COLORS[di++ % DEST_COLORS.length]!);
+    }
+    this.liveSig = this.items.map((i) => i.id).join(',');
+  }
+
+  /** Keep the header clock + expiring ticker live, and refresh the tray as dock orders change. */
   syncClock(s: GameState): void {
     if (!this.open_) return;
     const left = s.config.durationMs - s.clockMs;
@@ -151,10 +172,22 @@ export class PackingOverlay {
     const expiring = s.requests.filter(
       (r) => r.status === 'active' && r.expiresAtMs - s.clockMs < 15_000,
     ).length;
-    this.expiringEl.textContent = expiring > 0 ? `${expiring} request${expiring > 1 ? 's' : ''} expiring!` : '';
+    this.expiringEl.textContent = expiring > 0 ? `${expiring} order${expiring > 1 ? 's' : ''} expiring!` : '';
+
+    // The board never freezes: an order can expire (or a new one arrive) while we pack.
+    const sig = s.requests
+      .filter((r) => r.originId === this.dockId && r.status === 'active')
+      .flatMap((r) => r.items.map((i) => i.id))
+      .join(',');
+    if (sig !== this.liveSig) {
+      this.setItemsFrom(s);
+      for (const id of [...this.placed.keys()]) if (!this.itemMap.has(id)) this.placed.delete(id);
+      if (this.held && !this.itemMap.has(this.held.itemId)) this.held = null;
+      this.renderAll();
+    }
   }
 
-  /** Chips to switch which idle owned ship loads this request (hidden if only one option). */
+  /** Chips to switch which idle owned ship loads at this dock (hidden if only one option). */
   private renderShipSelect(s: GameState, activeId: string): void {
     const eligible = s.ships.filter((sh) => (sh.owned && sh.status === 'idle') || sh.id === activeId);
     if (eligible.length <= 1) {
@@ -169,11 +202,14 @@ export class PackingOverlay {
       .join('');
   }
 
+  private colorOf(itemId: string): string {
+    return this.destColor.get(this.destByItem.get(itemId) ?? '') ?? DEST_COLORS[0]!;
+  }
+
   // ── setup / rendering ────────────────────────────────────────────────────────
   private buildGrid(): void {
     this.gridEl.style.gridTemplateColumns = `repeat(${this.w}, ${CELL}px)`;
     this.gridEl.style.gridAutoRows = `${CELL}px`;
-    // remove old cells (keep the pieces-layer child)
     this.cells.forEach((c) => c.remove());
     this.cells = [];
     for (let i = 0; i < this.w * this.h; i++) {
@@ -197,8 +233,7 @@ export class PackingOverlay {
     for (const [itemId, p] of this.placed) {
       const item = this.itemMap.get(itemId);
       if (!item) continue;
-      const color = this.colorByItem.get(itemId) ?? PIECE_COLORS[0]!;
-      const el = pieceEl(item, p.rot, p.flipped, CELL, color);
+      const el = pieceEl(item, p.rot, p.flipped, CELL, this.colorOf(itemId));
       el.style.left = `${p.origin.x * CELL}px`;
       el.style.top = `${p.origin.y * CELL}px`;
       this.piecesLayer.appendChild(el);
@@ -206,20 +241,26 @@ export class PackingOverlay {
   }
 
   private renderTray(): void {
+    const placedIds = new Set(this.placed.keys());
     const parts: string[] = [];
     let any = false;
-    for (const item of this.items) {
-      if (this.placed.has(item.id)) continue;
+    for (const [dest, color] of this.destColor) {
+      const pieces = this.items.filter((it) => this.destByItem.get(it.id) === dest && !placedIds.has(it.id));
+      if (pieces.length === 0) continue;
       any = true;
-      const isHeld = this.held?.itemId === item.id;
-      const color = PIECE_COLORS[this.colorIndexFor(item.id)]!;
       parts.push(
-        `<div class="tray-piece ${isHeld ? 'held' : ''}" data-item="${item.id}">
-          ${pieceSVG(item, color)}
-          <span class="t-label">${item.label ?? 'Cargo'}</span>
-          <span class="t-val">${formatMoney(item.value)}</span>
-        </div>`,
+        `<div class="tray-dest"><span class="tray-dot" style="background:${color}"></span>→ ${this.nameOf(dest)}</div>`,
       );
+      for (const item of pieces) {
+        const isHeld = this.held?.itemId === item.id;
+        parts.push(
+          `<div class="tray-piece ${isHeld ? 'held' : ''}" data-item="${item.id}">
+            ${pieceSVG(item, color)}
+            <span class="t-label">${item.label ?? 'Cargo'}</span>
+            <span class="t-val">${formatMoney(item.value)}</span>
+          </div>`,
+        );
+      }
     }
     this.trayEl.innerHTML = any
       ? parts.join('')
@@ -232,9 +273,11 @@ export class PackingOverlay {
     const loaded = loadedValue(placements, this.itemMap);
     const fill = fillRatio(this.w, this.h, occupied);
     const pay = computePayout({ loaded, fill, owned: this.owned, feeFraction: this.fee });
+    const drops = new Set([...this.placed.keys()].map((id) => this.destByItem.get(id))).size;
     this.readoutEl.innerHTML =
       `<span>Value <b>${formatMoney(loaded)}</b></span>` +
       `<span>Fill <b>${Math.round(fill * 100)}%</b></span>` +
+      `<span>Drops <b>${drops}</b></span>` +
       `<span>Payout <b>${formatMoney(pay.net)}</b></span>`;
     this.commitBtn.disabled = placements.length === 0;
   }
@@ -245,9 +288,8 @@ export class PackingOverlay {
       return;
     }
     const item = this.itemMap.get(this.held.itemId)!;
-    const color = PIECE_COLORS[this.colorIndexFor(this.held.itemId)]!;
     this.ghostEl.innerHTML = '';
-    const el = pieceEl(item, this.held.rot, this.held.flipped, CELL, color);
+    const el = pieceEl(item, this.held.rot, this.held.flipped, CELL, this.colorOf(this.held.itemId));
     el.style.left = '0px';
     el.style.top = '0px';
     this.ghostEl.appendChild(el);
@@ -256,7 +298,6 @@ export class PackingOverlay {
   }
 
   private positionGhost(): void {
-    // top-left of the piece tracks the cursor
     this.ghostEl.style.transform = `translate(${this.pointer.x}px, ${this.pointer.y}px)`;
   }
 
@@ -304,11 +345,6 @@ export class PackingOverlay {
     }
   }
 
-  private colorIndexFor(itemId: string): number {
-    const i = this.items.findIndex((it) => it.id === itemId);
-    return ((i < 0 ? 0 : i) % PIECE_COLORS.length + PIECE_COLORS.length) % PIECE_COLORS.length;
-  }
-
   // ── interaction ──────────────────────────────────────────────────────────────
   private wire(): void {
     document.addEventListener('pointermove', (e) => {
@@ -320,7 +356,6 @@ export class PackingOverlay {
       }
     });
 
-    // pick up a tray piece
     this.trayEl.addEventListener('click', (e) => {
       const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-item]');
       if (!chip || this.held) return;
@@ -331,7 +366,6 @@ export class PackingOverlay {
       this.tint();
     });
 
-    // place / pick-up on the grid (coordinate-based, not element-based)
     this.gridEl.addEventListener('click', () => this.onGridClick());
     this.gridEl.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -349,7 +383,7 @@ export class PackingOverlay {
       const act = btn.dataset.act;
       if (act === 'rotate') this.rotateHeld();
       else if (act === 'flip') this.flipHeld();
-      else if (act === 'cancel') this.cb.onCancel(this.requestId, this.shipId);
+      else if (act === 'cancel') this.cb.onCancel(this.shipId);
       else if (act === 'commit') this.commit();
     });
 
@@ -360,7 +394,7 @@ export class PackingOverlay {
       else if (k === 'f') this.flipHeld();
       else if (e.key === 'Escape') {
         if (this.held) this.releaseHeld();
-        else this.cb.onCancel(this.requestId, this.shipId);
+        else this.cb.onCancel(this.shipId);
       }
     });
   }
@@ -370,17 +404,18 @@ export class PackingOverlay {
     if (!cell) return;
     if (this.held) {
       if (this.heldValidAt(cell)) {
-        if (!this.colorByItem.has(this.held.itemId)) {
-          this.colorByItem.set(this.held.itemId, PIECE_COLORS[this.colorIndexFor(this.held.itemId)]!);
-        }
-        this.placed.set(this.held.itemId, { itemId: this.held.itemId, rot: this.held.rot, flipped: this.held.flipped, origin: cell });
+        this.placed.set(this.held.itemId, {
+          itemId: this.held.itemId,
+          rot: this.held.rot,
+          flipped: this.held.flipped,
+          origin: cell,
+        });
         this.held = null;
         sfx.place();
         this.renderAll();
       }
       return;
     }
-    // not holding → pick up a placed piece if the clicked cell belongs to one
     const owner = this.ownerAt(cell);
     if (owner) {
       const p = this.placed.get(owner)!;
@@ -424,7 +459,7 @@ export class PackingOverlay {
   private commit(): void {
     const placements = [...this.placed.values()];
     if (placements.length === 0) return;
-    this.cb.onCommit(this.requestId, this.shipId, placements);
+    this.cb.onCommit(this.shipId, placements);
   }
 }
 
@@ -450,7 +485,6 @@ function pieceEl(item: PolyominoItem, rot: Rotation, flipped: boolean, cellPx: n
 }
 
 function pieceSVG(item: PolyominoItem, color: string): string {
-  // small static glyph for the tray (delegates to shapeGlyph styling but inline here for color)
   const cells = orientedCells(item.cells, 0, false);
   const { w, h } = boundingBox(cells);
   const cell = 11;

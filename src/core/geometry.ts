@@ -28,19 +28,30 @@ export function routeProgress(departedAtMs: number, arriveAtMs: number, nowMs: n
   return clamp01((nowMs - departedAtMs) / (arriveAtMs - departedAtMs));
 }
 
-/** Total length of a (possibly two-segment) path from→via→to. */
-export function pathLength(from: Vec2, via: Vec2 | undefined, to: Vec2): number {
-  return via ? distance(from, via) + distance(via, to) : distance(from, to);
+/** Cumulative arc length at each vertex of a polyline. out[0] === 0; out.length === pts.length. */
+export function cumulativeLengths(pts: readonly Vec2[]): number[] {
+  const out: number[] = [0];
+  for (let i = 1; i < pts.length; i++) out.push(out[i - 1]! + distance(pts[i - 1]!, pts[i]!));
+  return out;
 }
 
-/** Position along a from→via→to path at fraction t (interpolated by arc length). */
-export function pathPosition(from: Vec2, via: Vec2 | undefined, to: Vec2, t: number): Vec2 {
-  if (!via) return lerpPoint(from, to, t);
-  const d1 = distance(from, via);
-  const d2 = distance(via, to);
-  const total = d1 + d2;
-  if (total === 0) return { x: to.x, y: to.y };
-  const travelled = clamp01(t) * total;
-  if (travelled <= d1) return lerpPoint(from, via, d1 === 0 ? 1 : travelled / d1);
-  return lerpPoint(via, to, d2 === 0 ? 1 : (travelled - d1) / d2);
+/** Position along a multi-vertex polyline at fraction t∈[0,1] of its total arc length. */
+export function polylinePosition(pts: readonly Vec2[], t: number): Vec2 {
+  if (pts.length === 0) return { x: 0, y: 0 };
+  const last = pts[pts.length - 1]!;
+  if (pts.length === 1) return { x: pts[0]!.x, y: pts[0]!.y };
+  const cum = cumulativeLengths(pts);
+  const total = cum[cum.length - 1]!;
+  if (total === 0) return { x: last.x, y: last.y };
+  const d = clamp01(t) * total;
+  let i = 1;
+  while (i < cum.length - 1 && cum[i]! < d) i++;
+  const segLen = cum[i]! - cum[i - 1]!;
+  const localT = segLen === 0 ? 1 : (d - cum[i - 1]!) / segLen;
+  return lerpPoint(pts[i - 1]!, pts[i]!, localT);
+}
+
+/** The polyline a route traces: its departure point followed by each stop position. */
+export function routePolyline(from: Vec2, stops: readonly { pos: Vec2 }[]): Vec2[] {
+  return [from, ...stops.map((s) => s.pos)];
 }

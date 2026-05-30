@@ -3,8 +3,9 @@
 **Working title:** *Dispatch*
 **Tagline:** A zeppelin dispatcher in the cyber-world of the Zybourne Clock.
 **Host:** dispatch.discordwell.com
-**Status:** v1 built & deployed — full 5-level campaign (title/level-select, persistence,
-multi-ship, packing puzzle, NPC charters, audio/juice). Remaining work is playtest balance (§9).
+**Status:** Live — full 5-level campaign on the **Zybourne City map** (dispatch between **docks**),
+with the **multi-load milk-run** (one hold carries several orders; auto-unload at each destination),
+multi-ship, NPC charters, audio/juice. Remaining work is playtest balance (§9).
 **Last updated:** 2026-05-30
 
 ---

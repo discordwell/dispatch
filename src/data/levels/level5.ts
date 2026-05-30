@@ -1,6 +1,6 @@
 import type { LevelConfig } from '../../core/types';
 
-/** Level 5 — ♠♠♠♠♠ "Five Aces". Full chaos: five ships, twelve cities, gnarly cargo. (Stub.) */
+/** Level 5 — ♠♠♠♠♠ "Five Aces". Full chaos: five ships, twelve docks, gnarly cargo. */
 export const level5: LevelConfig = {
   index: 5,
   rank: '♠♠♠♠♠',
@@ -8,18 +8,18 @@ export const level5: LevelConfig = {
   durationMs: 600_000,
   threshold: 18_000,
   cityIds: [
-    'zybourne',
-    'clockhaven',
-    'tickmoor',
-    'nimbus-wharf',
-    'aetherhaven',
-    'brassholm',
-    'cogsworth',
-    'gearford',
-    'sprocket-bay',
-    'mainspring',
-    'escapement',
-    'fiveaces-landing',
+    'loading-bay',
+    'the-slums',
+    'commercial-quay',
+    'uptown-heights',
+    'clocktower-plaza',
+    'garrison-keep',
+    'cog-junction',
+    'aether-pier',
+    'sprocket-row',
+    'gearford-wall',
+    'brass-gate',
+    'tinkers-end',
   ],
   ownedShips: [
     { shipClass: 'Hauler' },

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { step } from '../src/core/sim';
 import { createGameState } from '../src/core/setup';
-import { bookNpc, commitPack } from '../src/state/actions';
+import { bookNpc, commitLoad } from '../src/state/actions';
 import { autoPack } from '../src/core/autopack';
 import type { DeliveryRequest, GameState, LevelConfig, NpcOffer, PolyominoItem } from '../src/core/types';
 
@@ -78,26 +78,27 @@ describe('npc charters', () => {
     }
   });
 
-  it('bookNpc spawns a non-owned ship, consumes the offer, and begins packing', () => {
+  it('bookNpc spawns a non-owned ship, consumes the offer, and begins loading', () => {
     const s = stateWithOffer();
-    const id = bookNpc(s, 'o1', 'r1');
+    const id = bookNpc(s, 'o1', 'a');
     expect(id).toMatch(/^npc-o1-\d+$/);
     expect(s.npcOffers).toHaveLength(0);
     const ship = s.ships.find((sh) => sh.id === id)!;
     expect(ship.owned).toBe(false);
     expect(ship.status).toBe('loading');
-    expect(s.requests[0]!.status).toBe('assigned');
+    expect(ship.loadingDockId).toBe('a');
+    expect(s.requests[0]!.status).toBe('active'); // loading doesn't freeze the order
   });
 
   it('a booked charter pays out minus its fee, then departs after delivering', () => {
     const s = stateWithOffer();
-    const id = bookNpc(s, 'o1', 'r1')!;
+    const id = bookNpc(s, 'o1', 'a')!;
     const ship = s.ships.find((sh) => sh.id === id)!;
     const placements = autoPack(ship.holdW, ship.holdH, s.requests[0]!.items);
-    expect(commitPack(s, 'r1', id, placements)).toBe(true);
+    expect(commitLoad(s, id, placements)).toBe(true);
     // loaded 200, fill 4/16 < floor → no bonus → gross 200, fee 30% → net 140
-    expect(ship.cargo!.payout).toBe(140);
-    step(s, 60_000); // plenty of time to fly spawn→origin→dest
+    expect(ship.hold!.lots[0]!.payout).toBe(140);
+    step(s, 60_000); // fly spawn→pickup→dest
     expect(s.earnings).toBe(140);
     expect(s.requests[0]!.status).toBe('delivered');
     expect(s.ships.find((sh) => sh.id === id)).toBeUndefined(); // charter departed
@@ -106,9 +107,9 @@ describe('npc charters', () => {
   it('re-booking a regenerated offer id never destroys a live charter (C1 regression)', () => {
     const s = stateWithOffer();
     // book + dispatch the first charter (now flying)
-    const id1 = bookNpc(s, 'o1', 'r1')!;
+    const id1 = bookNpc(s, 'o1', 'a')!;
     const ship1 = s.ships.find((sh) => sh.id === id1)!;
-    expect(commitPack(s, 'r1', id1, autoPack(ship1.holdW, ship1.holdH, s.requests[0]!.items))).toBe(true);
+    expect(commitLoad(s, id1, autoPack(ship1.holdW, ship1.holdH, s.requests[0]!.items))).toBe(true);
     expect(ship1.status).toBe('flying');
 
     // a roster refresh regenerates the SAME offer id while the charter is still in flight
@@ -132,7 +133,7 @@ describe('npc charters', () => {
       feeFraction: 0.3,
     });
 
-    const id2 = bookNpc(s, 'o1', 'r2');
+    const id2 = bookNpc(s, 'o1', 'a');
     if (id2) expect(id2).not.toBe(id1); // distinct ship, no collision
     // the original in-flight charter must survive and still pay out
     expect(s.ships.some((sh) => sh.id === id1 && sh.status === 'flying')).toBe(true);

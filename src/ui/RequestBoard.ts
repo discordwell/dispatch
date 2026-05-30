@@ -1,38 +1,44 @@
 import { config } from '../config';
 import { idleShips, npcOfferNear } from '../state/actions';
-
-type Avail = { kind: 'owned' | 'charter' | 'none'; feePct: number };
 import type { City, DeliveryRequest, GameState } from '../core/types';
 import { formatCountdown, formatMoney } from './format';
 import { shapeGlyphSVG } from './shapeGlyph';
 
-/** The city panel: current ("Available") + soon-to-arrive ("Incoming") delivery requests. */
+type Avail = { kind: 'owned' | 'charter' | 'none'; feePct: number };
+
+/**
+ * The dock board: the orders waiting here now ("Available") + soon-to-arrive ("Incoming").
+ * One dock-level action loads a ship with any subset of the available orders (the milk-run).
+ */
 export class RequestBoard {
   readonly el: HTMLElement;
   private headTitle: HTMLElement;
   private body: HTMLElement;
+  private foot: HTMLElement;
   private lastSig = '';
   private cityName = '';
+  private cityId = '';
   private nameOf: (id: string) => string = (id) => id;
 
-  constructor(parent: HTMLElement, onDispatch: (requestId: string) => void) {
+  constructor(parent: HTMLElement, onLoadDock: (cityId: string) => void) {
     const el = document.createElement('div');
     el.className = 'panel';
     el.innerHTML = `
       <div class="panel-head">
         <span class="panel-title"></span>
-        <span class="panel-sub">request board</span>
+        <span class="panel-sub">dock board</span>
       </div>
-      <div class="panel-body"></div>`;
+      <div class="panel-body"></div>
+      <div class="panel-foot"></div>`;
     parent.appendChild(el);
     this.el = el;
     this.headTitle = el.querySelector('.panel-title')!;
     this.body = el.querySelector('.panel-body')!;
+    this.foot = el.querySelector('.panel-foot')!;
 
-    // Event delegation for the dispatch buttons.
-    this.body.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-dispatch]');
-      if (btn && !(btn as HTMLButtonElement).disabled) onDispatch(btn.dataset.dispatch!);
+    this.foot.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-load-dock]');
+      if (btn && !(btn as HTMLButtonElement).disabled) onLoadDock(this.cityId);
     });
   }
 
@@ -48,6 +54,7 @@ export class RequestBoard {
       return;
     }
     this.el.classList.add('show');
+    this.cityId = cityId;
     this.nameOf = (id) => s.cities.find((c) => c.id === id)?.name ?? id;
 
     const active = s.requests.filter((r) => r.status === 'active' && r.originId === cityId);
@@ -56,7 +63,7 @@ export class RequestBoard {
       .sort((a, b) => a.spawnAtMs - b.spawnAtMs)
       .slice(0, config.UPCOMING_PEEK);
     const charter = npcOfferNear(s, cityId);
-    const avail: Avail = idleShips(s).length
+    const avail: Avail = idleShips(s).some((sh) => sh.owned)
       ? { kind: 'owned', feePct: 0 }
       : charter
         ? { kind: 'charter', feePct: Math.round(charter.feeFraction * 100) }
@@ -81,20 +88,34 @@ export class RequestBoard {
     this.headTitle.textContent = city.name;
     const parts: string[] = [];
     if (active.length === 0 && upcoming.length === 0) {
-      parts.push(`<div class="panel-empty">No requests posted here.<br>The skies are quiet.</div>`);
+      parts.push(`<div class="panel-empty">No orders posted here.<br>The skies are quiet.</div>`);
     }
     if (active.length) {
       parts.push(`<div class="section-label">Available now</div>`);
-      for (const r of active) parts.push(this.card(r, true, avail));
+      for (const r of active) parts.push(this.card(r, true));
     }
     if (upcoming.length) {
       parts.push(`<div class="section-label">Incoming</div>`);
-      for (const r of upcoming) parts.push(this.card(r, false, avail));
+      for (const r of upcoming) parts.push(this.card(r, false));
     }
     this.body.innerHTML = parts.join('');
+
+    // one dock-level action: load a ship with any subset of the available orders
+    let action = '';
+    if (active.length) {
+      if (avail.kind === 'owned') {
+        action = `<button class="btn" data-load-dock="${city.id}">Load Cargo</button>`;
+      } else if (avail.kind === 'charter') {
+        action = `<button class="btn" data-load-dock="${city.id}" title="Hire a charter (fee on payout)">Hire Charter −${avail.feePct}%</button>`;
+      } else {
+        action = `<button class="btn" disabled title="No airship available">No airship</button>`;
+      }
+    }
+    this.foot.innerHTML = action;
+    this.foot.style.display = action ? '' : 'none';
   }
 
-  private card(r: DeliveryRequest, isActive: boolean, avail: Avail): string {
+  private card(r: DeliveryRequest, isActive: boolean): string {
     const dest = this.nameOf(r.destId);
     const glyphs = r.items
       .map((it) => `<span title="${it.label ?? 'cargo'} · ${formatMoney(it.value)}">${shapeGlyphSVG(it.cells, { cell: 7 })}</span>`)
@@ -102,16 +123,6 @@ export class RequestBoard {
     const timer = isActive
       ? `<span class="req-timer" data-exp="${r.expiresAtMs}">expires …</span>`
       : `<span class="req-timer" data-spawn="${r.spawnAtMs}">incoming …</span>`;
-    let action = '';
-    if (isActive) {
-      if (avail.kind === 'owned') {
-        action = `<button class="btn" data-dispatch="${r.id}">Load Cargo</button>`;
-      } else if (avail.kind === 'charter') {
-        action = `<button class="btn" data-dispatch="${r.id}" title="Hire a charter (fee on payout)">Hire Charter −${avail.feePct}%</button>`;
-      } else {
-        action = `<button class="btn" disabled title="No airship available">No airship</button>`;
-      }
-    }
     return `
       <div class="req ${isActive ? '' : 'upcoming'}" data-req="${r.id}">
         <div class="req-top">
@@ -119,7 +130,7 @@ export class RequestBoard {
           <span class="req-reward">${formatMoney(r.baseReward)}</span>
         </div>
         <div class="req-glyphs">${glyphs}</div>
-        <div class="req-meta">${timer}${action}</div>
+        <div class="req-meta">${timer}</div>
       </div>`;
   }
 

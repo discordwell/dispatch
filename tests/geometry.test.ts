@@ -6,6 +6,9 @@ import {
   lerpPoint,
   clamp01,
   routeProgress,
+  cumulativeLengths,
+  polylinePosition,
+  routePolyline,
 } from '../src/core/geometry';
 
 describe('geometry', () => {
@@ -44,5 +47,37 @@ describe('geometry', () => {
     expect(routeProgress(0, 1000, -50)).toBe(0);
     expect(routeProgress(0, 1000, 99999)).toBe(1);
     expect(routeProgress(500, 500, 500)).toBe(1); // zero-length route
+  });
+});
+
+describe('multi-stop geometry', () => {
+  const L = [{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: 4 }]; // arc lengths 0,3,7
+
+  it('cumulativeLengths accumulates per-segment distance', () => {
+    expect(cumulativeLengths(L)).toEqual([0, 3, 7]);
+    expect(cumulativeLengths([{ x: 5, y: 5 }])).toEqual([0]);
+  });
+
+  it('polylinePosition walks the polyline by arc length', () => {
+    expect(polylinePosition(L, 0)).toEqual({ x: 0, y: 0 });
+    expect(polylinePosition(L, 1)).toEqual({ x: 3, y: 4 });
+    expect(polylinePosition(L, 3 / 7)).toEqual({ x: 3, y: 0 }); // exactly the corner
+    expect(polylinePosition(L, 0.5)).toEqual({ x: 3, y: 0.5 }); // half of total length (3.5)
+  });
+
+  it('polylinePosition clamps t and handles degenerate inputs', () => {
+    expect(polylinePosition(L, -1)).toEqual({ x: 0, y: 0 });
+    expect(polylinePosition(L, 2)).toEqual({ x: 3, y: 4 });
+    expect(polylinePosition([{ x: 5, y: 5 }], 0.7)).toEqual({ x: 5, y: 5 }); // single point
+    expect(polylinePosition([{ x: 2, y: 2 }, { x: 2, y: 2 }], 0.5)).toEqual({ x: 2, y: 2 }); // zero length
+  });
+
+  it('routePolyline prepends the departure point to the stop positions', () => {
+    const stops = [{ pos: { x: 1, y: 1 } }, { pos: { x: 2, y: 2 } }];
+    expect(routePolyline({ x: 0, y: 0 }, stops)).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+    ]);
   });
 });

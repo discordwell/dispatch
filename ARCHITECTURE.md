@@ -28,28 +28,28 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 | Path | Role | Pure? |
 |------|------|:----:|
 | `src/config.ts` | global tunables (tick rate, payout curve, speeds) | ✓ |
-| `src/core/types.ts` | all domain interfaces (City, Airship, DeliveryRequest, PolyominoItem, Placement, PackingState, GameState, LevelConfig) | ✓ |
+| `src/core/types.ts` | domain interfaces (City [=dock], Airship, Route/RouteStop, CargoLot/Hold, DeliveryRequest, PolyominoItem, Placement, GameState, LevelConfig) | ✓ |
 | `src/core/rng.ts` | mulberry32 seeded PRNG | ✓ |
-| `src/core/geometry.ts` | distance, travelTimeMs, lerp-along-route | ✓ |
+| `src/core/geometry.ts` | distance, travelTimeMs, multi-stop polyline position | ✓ |
 | `src/core/polyomino.ts` | rotate90 / flip / normalize / orientedCells / bbox | ✓ |
 | `src/core/packing.ts` | derived occupancy grid, canPlace, fillRatio | ✓ |
 | `src/core/payout.ts` | loaded value + efficiency bonus + NPC fee | ✓ |
 | `src/core/requestGen.ts` | seeded request schedule from LevelConfig | ✓ |
 | `src/core/sim.ts` | `step(state, dtMs)`: movement, ETAs, spawn/expiry, money, win/lose | ✓ |
 | `src/state/store.ts` | holds GameState; subscribe/getState/tick | – |
-| `src/state/actions.ts` | intents: assignRequest, bookNpc, commitPack, deliver… | – |
+| `src/state/actions.ts` | intents: beginLoad / commitLoad / cancelLoad, splitNet, buildMilkRun, bookNpc | – |
 | `src/engine/loop.ts` | rAF fixed-timestep accumulator | – |
-| `src/render/MapRenderer.ts` | Canvas: parchment map, routes, cities, airships | – |
+| `src/render/MapRenderer.ts` | Canvas: city-map raster (+white knockout), multi-stop routes, docks, airships | – |
 | `src/render/paint.ts` | procedural brass/parchment/glow draw helpers | – |
 | `src/render/hitTest.ts` | screen→world; which city/ship is under the cursor | – |
 | `src/ui/Hud.ts` | money, shift clock, threshold progress | – |
-| `src/ui/RequestBoard.ts` | city panel: current + upcoming requests | – |
-| `src/ui/ShipInspector.ts` | ship status / cargo / ETA | – |
+| `src/ui/RequestBoard.ts` | dock board: orders here + incoming; one dock-level Load action | – |
+| `src/ui/ShipInspector.ts` | ship status / multi-stop route / cargo / next-stop ETA | – |
 | `src/ui/PackingOverlay.ts` | the cargo puzzle: grid + draggable polyominoes | – |
 | `src/ui/dragController.ts` | pointer drag/rotate/flip state machine | – |
 | `src/ui/BookingDialog.ts` | book an NPC ship for a request | – |
 | `src/ui/flavor.ts` | verbatim Zybourne quotes / loading lines | – |
-| `src/data/cities.ts` | named city catalog (superset for all levels) | ✓ |
+| `src/data/cities.ts` | dock catalog (a `City` models a dock; superset for all levels) | ✓ |
 | `src/data/shapes.ts` | polyomino library, tiered by difficulty | ✓ |
 | `src/data/ships.ts` | ship classes (Scout 4×4, Hauler 5×6, Leviathan 6×8) | ✓ |
 | `src/data/levels/*` | `LevelConfig`s; level1 concrete, 2–5 stubs | ✓ |
@@ -68,14 +68,15 @@ of the architecture for free (the loop has no concept of "a modal is open").
 
 ## Rendering split
 
-- **Canvas** (one full-bleed layer, `z-map`) — the live map: parchment ground, routes, city
-  nodes, moving airships, glow. Immediate-mode redraw suits ≤12 moving sprites.
-- **DOM/CSS** (`z-panels`, `z-overlay`) — HUD, request boards, ship inspector, and the packing
+- **Canvas** (one full-bleed layer, `z-map`) — the live map: the **Zybourne City raster** (its flat
+  white surround knocked out at load so the sepia panel shows through), brass frame, multi-stop routes,
+  dock nodes, moving airships, glow. Immediate-mode redraw suits ≤12 moving sprites.
+- **DOM/CSS** (`z-panels`, `z-overlay`) — HUD, dock boards, ship inspector, and the packing
   overlay. Pointer Events + CSS transforms give accessible, GPU-composited drag/rotate/flip.
 
-**Painterly steampunk with no raster assets:** SVG `feTurbulence` filters in `index.html` `<defs>`
-(parchment grain, brushed-brass displacement) referenced from CSS; Canvas gradients for metal and
-glow; inline SVG ornaments. Expensive noise is baked to a static layer, not animated per frame.
+**Painterly steampunk:** the world map is a hand-drawn raster framed by procedural brass (Canvas
+gradients for metal/glow, a load-time vignette settling the raster into the surround). Dock label
+plates are dark + brass-edged for legibility over the colorful map. UI chrome stays asset-free.
 
 ## Packing engine
 
@@ -84,6 +85,27 @@ re-normalize (translate to origin + sort) so equality/dedup is well-defined. Hol
 `Uint8Array(w*h)` **derived on demand** from `placements` (never stored stale). `canPlace` checks
 bounds + overlap. Payout = loaded value + `BONUS_MAX·smoothstep(fill, FILL_FLOOR, 1)`, then the NPC
 fee for booked ships. Partial loads are allowed; choosing the best-value subset is the puzzle.
+
+## Map & multi-load milk-run
+
+- **Map:** the world is the **Zybourne City** raster (`src/assets/zybourne-city.png`, 765×600), drawn
+  by `paint.paintCityMap` inside the procedural brass frame. `MapRenderer.knockOutWhiteBackground`
+  flood-fills the source GIF's flat white surround to transparent at load (edge-contiguous only, so
+  interior label fills survive) and the sepia panel shows behind the city silhouette. Map units = image
+  pixels. The 12 nodes in `data/cities.ts` are **docks** over the districts; the `City` type / `cityId`
+  are unchanged internally (a "city" now models a dock).
+- **Loading is dock-scoped, not request-scoped.** `beginLoad(dockId, shipId)` reserves a ship to load a
+  dock; `PackingOverlay` offers every active order at that dock, grouped/colored by destination, and the
+  player packs any subset into one hold. `commitLoad(shipId, placements)` groups placements by request
+  into `CargoLot`s, computes the whole-hold payout once and `splitNet`s it across lots by value, then
+  dispatches. Orders are NOT frozen while loading (time never pauses); commit re-validates and drops any
+  order that expired or was taken by another ship mid-pack, dispatching the valid remainder.
+- **Multi-stop route.** `buildMilkRun` orders the lots' distinct destinations nearest-neighbour from the
+  dock (deterministic tie-break), prepending a non-crediting **pickup stop** when the ship isn't already
+  there (so any idle ship can load any dock, and charters fly in). `Route.stops[]` carries per-stop
+  arrival times at one cruise speed, so a single `routeProgress` over the full `routePolyline` positions
+  the ship. `sim.advanceStops` credits each stop reached this tick exactly once (auto-unloading the lots
+  due there, one `deliver` event per stop) and idles the ship at the final drop — where it can load again.
 
 ## Campaign, feedback & audio (full game)
 

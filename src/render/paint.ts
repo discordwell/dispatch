@@ -33,48 +33,45 @@ export function paintScreenBackground(ctx: CanvasRenderingContext2D, w: number, 
   ctx.fillRect(0, 0, w, h);
 }
 
-/** World-space parchment sheet with brass frame + corner rivets. */
-export function paintParchment(ctx: CanvasRenderingContext2D): void {
+/** World-space city-map background: the Zybourne City raster inside a brass frame. */
+export function paintCityMap(ctx: CanvasRenderingContext2D, img: CanvasImageSource | null): void {
   const W = config.MAP_W;
   const H = config.MAP_H;
   const r = 26;
 
-  // drop shadow
+  // drop shadow + base panel (shows through if the image hasn't loaded yet)
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.55)';
   ctx.shadowBlur = 48;
   ctx.shadowOffsetY = 16;
-  ctx.fillStyle = COL.parch1;
+  ctx.fillStyle = COL.sepia2;
   roundRect(ctx, 0, 0, W, H, r);
   ctx.fill();
   ctx.restore();
 
-  // parchment fill
-  const g = ctx.createRadialGradient(W * 0.5, H * 0.42, 60, W * 0.5, H * 0.5, Math.max(W, H) * 0.62);
-  g.addColorStop(0, COL.parch2);
-  g.addColorStop(0.7, COL.parch1);
-  g.addColorStop(1, COL.parch0);
-  ctx.fillStyle = g;
-  roundRect(ctx, 0, 0, W, H, r);
-  ctx.fill();
-
-  // faint cartographic hairlines
+  // the map raster, clipped to the rounded panel
   ctx.save();
   roundRect(ctx, 0, 0, W, H, r);
   ctx.clip();
-  ctx.strokeStyle = 'rgba(92,70,49,0.10)';
-  ctx.lineWidth = 1;
-  for (let x = 100; x < W; x += 100) line(ctx, x, 0, x, H);
-  for (let y = 100; y < H; y += 100) line(ctx, 0, y, W, y);
-  // edge vignette
-  const v = ctx.createRadialGradient(W * 0.5, H * 0.5, Math.min(W, H) * 0.36, W * 0.5, H * 0.5, Math.max(W, H) * 0.62);
+  if (img) {
+    ctx.drawImage(img, 0, 0, W, H);
+  } else {
+    ctx.fillStyle = COL.parch1;
+    ctx.fillRect(0, 0, W, H);
+  }
+  // edge vignette — settles the bright raster into the steampunk surround
+  const v = ctx.createRadialGradient(W * 0.5, H * 0.5, Math.min(W, H) * 0.44, W * 0.5, H * 0.5, Math.max(W, H) * 0.66);
   v.addColorStop(0, 'rgba(0,0,0,0)');
-  v.addColorStop(1, 'rgba(60,40,20,0.35)');
+  v.addColorStop(1, 'rgba(28,18,8,0.42)');
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
 
-  // brass frame
+  paintBrassFrame(ctx, W, H, r);
+}
+
+/** Brass frame + corner rivets around the map panel. */
+function paintBrassFrame(ctx: CanvasRenderingContext2D, W: number, H: number, r: number): void {
   ctx.lineJoin = 'round';
   const fg = ctx.createLinearGradient(0, 0, 0, H);
   fg.addColorStop(0, COL.brass3);
@@ -164,16 +161,20 @@ export function paintCity(ctx: CanvasRenderingContext2D, c: { name: string; x: n
   ctx.lineTo(c.x + R * 0.24, c.y + R * 0.1);
   ctx.stroke();
 
-  // label plate
-  ctx.font = `600 ${o.hub ? 20 : 16}px Georgia, 'Times New Roman', serif`;
+  // label plate (dark + brass-edged, for legibility over the colorful city map)
+  ctx.font = `600 ${o.hub ? 18 : 14}px Georgia, 'Times New Roman', serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const tw = ctx.measureText(c.name).width;
   const ly = c.y + R + 14;
-  ctx.fillStyle = 'rgba(40,26,16,0.18)';
-  roundRect(ctx, c.x - tw / 2 - 7, ly - 11, tw + 14, 22, 6);
+  ctx.fillStyle = 'rgba(20,13,6,0.82)';
+  roundRect(ctx, c.x - tw / 2 - 8, ly - 11, tw + 16, 22, 6);
   ctx.fill();
-  ctx.fillStyle = COL.parchInk;
+  ctx.strokeStyle = 'rgba(232,200,122,0.5)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, c.x - tw / 2 - 8, ly - 11, tw + 16, 22, 6);
+  ctx.stroke();
+  ctx.fillStyle = COL.parch2;
   ctx.fillText(c.name, c.x, ly);
 
   // active-request badge (pulses red when a request is about to expire)
@@ -305,12 +306,6 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 function disc(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
   ctx.beginPath();
   ctx.arc(x, y, r, 0, TAU);
-}
-function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
 }
 function polyline(ctx: CanvasRenderingContext2D, pts: Vec2[]): void {
   ctx.beginPath();
