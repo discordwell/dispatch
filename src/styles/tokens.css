@@ -1,0 +1,120 @@
+/* ---------------------------------------------------------------------------
+   Design tokens — painterly steampunk palette + type.
+   Warm sepia ground, brushed brass, verdigris accents, parchment panels.
+   --------------------------------------------------------------------------- */
+:root {
+  /* Ground / shadow */
+  --sepia-0: #160f08;
+  --sepia-1: #241a10;
+  --sepia-2: #34261a;
+  --sepia-3: #4a3725;
+
+  /* Parchment (panels, boards) */
+  --parch-0: #c9b48a;
+  --parch-1: #ddc9a0;
+  --parch-2: #ece0c2;
+  --parch-ink: #2b2018;
+  --parch-ink-soft: #5a4631;
+
+  /* Brass (frames, rivets, headings) */
+  --brass-0: #6b4e0a;
+  --brass-1: #9a7414;
+  --brass-2: #c79a2e;
+  --brass-3: #e8c87a;
+  --brass-hi: #f8e7b0;
+
+  /* Verdigris (oxidized copper accents, routes) */
+  --verd-0: #234c44;
+  --verd-1: #3a7d6e;
+  --verd-2: #5fae9b;
+
+  /* Signals */
+  --danger: #a83232;
+  --danger-hi: #e0654f;
+  --ok: #6f9b3f;
+  --ok-hi: #a6cf6a;
+  --gold: #e8c87a;
+
+  /* Ink on dark */
+  --ink-0: #f3e9d2;
+  --ink-1: #d8c4a0;
+  --ink-dim: #a08a66;
+
+  /* Type */
+  --font-display: 'Cinzel', 'Hoefler Text', 'Trajan Pro', Georgia, 'Times New Roman', serif;
+  --font-body: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, 'Roboto Mono', monospace;
+
+  /* Spacing / depth */
+  --bezel: 0 1px 0 rgba(248, 231, 176, 0.25), 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  --frame-shadow: 0 8px 30px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+
+  /* Z layers */
+  --z-map: 0;
+  --z-panels: 10;
+  --z-overlay: 100;
+  --z-toast: 200;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(120% 120% at 50% 18%, var(--sepia-2), var(--sepia-0) 70%);
+  color: var(--ink-0);
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.svg-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Boot splash (replaced once the game mounts) */
+.boot {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  font-family: var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.boot h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 5vw, 3.4rem);
+  color: var(--brass-3);
+  text-shadow: 0 2px 0 var(--sepia-0), 0 0 28px rgba(232, 200, 122, 0.25);
+}
+.boot p {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.22em;
+  color: var(--ink-dim);
+}
