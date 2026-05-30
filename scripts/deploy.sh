@@ -14,23 +14,23 @@ CADDY_SRC="deploy/Caddyfile.dispatch.discordwell.com"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$HERE"
 
-echo "▸ building (tsc + vite)…"
+echo ">> building (tsc + vite)"
 npm run build
 
-echo "▸ ensuring $SITE_DIR on $REMOTE…"
-ssh "$REMOTE" "sudo mkdir -p '$SITE_DIR' && sudo chown -R \$(whoami) /opt/dispatch"
+echo ">> ensuring ${SITE_DIR} on ${REMOTE}"
+ssh "${REMOTE}" "sudo mkdir -p '${SITE_DIR}' && sudo chown -R \$(whoami) /opt/dispatch"
 
-echo "▸ syncing dist/ → $REMOTE:$SITE_DIR…"
-rsync -az --delete dist/ "$REMOTE:$SITE_DIR/"
+echo ">> syncing dist/ to ${REMOTE}:${SITE_DIR}"
+rsync -az --delete dist/ "${REMOTE}:${SITE_DIR}/"
 
-echo "▸ installing Caddy site block…"
-rsync -az "$CADDY_SRC" "$REMOTE:/tmp/dispatch.caddy"
-ssh "$REMOTE" "sudo mkdir -p /etc/caddy/sites \
+echo ">> installing Caddy site block"
+rsync -az "${CADDY_SRC}" "${REMOTE}:/tmp/dispatch.caddy"
+ssh "${REMOTE}" "sudo mkdir -p /etc/caddy/sites \
   && sudo mv /tmp/dispatch.caddy /etc/caddy/sites/dispatch.discordwell.com \
   && sudo systemctl reload caddy"
 
-echo "▸ verifying…"
+echo ">> verifying"
 sleep 2
 code="$(curl -sS -o /dev/null -w '%{http_code}' https://dispatch.discordwell.com/ || true)"
-echo "  https://dispatch.discordwell.com/ → HTTP $code"
-echo "▸ done."
+echo ">> https://dispatch.discordwell.com/ -> HTTP ${code}"
+echo ">> done."

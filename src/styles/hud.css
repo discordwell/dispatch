@@ -115,3 +115,24 @@
     opacity: 0.45;
   }
 }
+
+.mute-btn {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: var(--z-panels);
+  width: 38px;
+  height: 38px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 10px;
+  color: var(--parch-ink);
+  background: linear-gradient(180deg, var(--parch-2), var(--parch-0));
+  border: 2px solid transparent;
+  border-image: linear-gradient(180deg, var(--brass-3), var(--brass-0)) 1;
+  box-shadow: var(--frame-shadow);
+}
+.mute-btn:hover {
+  filter: brightness(1.06);
+}

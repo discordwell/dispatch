@@ -1,23 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { LEVELS, getLevel } from '../src/data/levels';
+import { LEVELS } from '../src/data/levels';
 import { createGameState } from '../src/core/setup';
 import { cityExists } from '../src/data/cities';
 import { SHIP_CLASSES } from '../src/data/ships';
 import { getShapesForTiers } from '../src/data/shapes';
 import { step } from '../src/core/sim';
 import { activeRequests, autoAssign, idleShips } from '../src/state/actions';
-import type { GameState } from '../src/core/types';
 
-/** Greedy reference policy: keep every idle ship busy on the best available request. */
-function playGreedy(s: GameState): number {
+/**
+ * Greedy reference policy with the real bottleneck: the dispatcher packs ONE ship at a
+ * time, and a pack costs overhead + perItem·items. Charters unused → a conservative lower
+ * bound on what a deliberate human can bank. Defaults model careful play.
+ */
+function playGated(idx: number, perItem = 3600, overhead = 2200): number {
+  const s = createGameState(idx);
+  let free = 0;
   let guard = 0;
-  while (s.outcome === 'playing' && guard++ < 200_000) {
-    const idle = idleShips(s).filter((sh) => sh.owned);
-    const active = activeRequests(s).sort((a, b) => b.baseReward - a.baseReward);
-    let ai = 0;
-    for (const ship of idle) {
-      if (ai >= active.length) break;
-      autoAssign(s, active[ai++]!.id, ship.id);
+  while (s.outcome === 'playing' && guard++ < 400_000) {
+    if (s.clockMs >= free) {
+      const idle = idleShips(s).filter((sh) => sh.owned);
+      const active = activeRequests(s).sort((a, b) => b.baseReward - a.baseReward);
+      if (idle[0] && active[0] && autoAssign(s, active[0].id, idle[0].id)) {
+        free = s.clockMs + overhead + perItem * active[0].items.length;
+      }
     }
     step(s, 100);
   }
@@ -47,14 +52,19 @@ describe('levels', () => {
     });
   });
 
-  it('level 1 is comfortably winnable by a greedy policy but not by doing nothing', () => {
-    const greedy = playGreedy(createGameState(1));
-    const threshold = getLevel(1).threshold;
-    expect(greedy).toBeGreaterThanOrEqual(threshold);
+  it('every level is winnable at a deliberate (packing-time-gated) pace', () => {
+    for (const lvl of LEVELS) {
+      const banked = playGated(lvl.index);
+      expect(banked, `level ${lvl.index} careful earnings ${banked} vs threshold ${lvl.threshold}`).toBeGreaterThanOrEqual(lvl.threshold);
+    }
+  });
 
-    const idle = createGameState(1);
-    while (idle.outcome === 'playing') step(idle, 1000);
-    expect(idle.earnings).toBe(0);
-    expect(idle.outcome).toBe('lost');
+  it('every level is lost by doing nothing', () => {
+    for (const lvl of LEVELS) {
+      const idle = createGameState(lvl.index);
+      while (idle.outcome === 'playing') step(idle, 1000);
+      expect(idle.earnings).toBe(0);
+      expect(idle.outcome).toBe('lost');
+    }
   });
 });

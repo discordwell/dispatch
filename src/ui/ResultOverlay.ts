@@ -5,9 +5,15 @@ import { LOSE_LINES, WIN_LINES, pickLine } from './flavor';
 export interface ResultCallbacks {
   onReplay: () => void;
   onNext: () => void;
+  onLevelSelect: () => void;
 }
 
-/** End-of-shift result: win/lose, the take vs the threshold, a flavor line, and what next. */
+export interface ResultOpts {
+  hasNext: boolean;
+  campaignComplete: boolean;
+}
+
+/** End-of-shift result: win/lose (or full-campaign victory), the take, a flavor line, what next. */
 export class ResultOverlay {
   readonly el: HTMLElement;
   private titleEl: HTMLElement;
@@ -37,6 +43,7 @@ export class ResultOverlay {
       if (!btn) return;
       if (btn.dataset.act === 'replay') cb.onReplay();
       else if (btn.dataset.act === 'next') cb.onNext();
+      else if (btn.dataset.act === 'levelselect') cb.onLevelSelect();
     });
   }
 
@@ -46,20 +53,27 @@ export class ResultOverlay {
     this.el.classList.remove('show');
   }
 
-  show(s: GameState, hasNext: boolean): void {
+  show(s: GameState, opts: ResultOpts): void {
+    if (this.shown) return; // outcome is terminal; build once
     const won = s.outcome === 'won';
+    const champ = opts.campaignComplete;
     this.el.classList.toggle('won', won);
-    this.titleEl.textContent = won ? 'Shift Complete' : 'Shift’s End';
-    this.subEl.innerHTML = won
-      ? `You banked <b>${formatMoney(s.earnings)}</b> — clear of the ${formatMoney(s.config.threshold)} mark.`
-      : `You banked <b>${formatMoney(s.earnings)}</b> — short of the ${formatMoney(s.config.threshold)} mark.`;
-    this.flavorEl.textContent = pickLine(won ? WIN_LINES : LOSE_LINES, s.earnings);
+
+    this.titleEl.textContent = champ ? 'Five Aces' : won ? 'Shift Complete' : 'Shift’s End';
+    this.subEl.innerHTML = champ
+      ? `All five ace tiers cleared — final shift banked <b>${formatMoney(s.earnings)}</b>.`
+      : won
+        ? `You banked <b>${formatMoney(s.earnings)}</b> — clear of the ${formatMoney(s.config.threshold)} mark.`
+        : `You banked <b>${formatMoney(s.earnings)}</b> — short of the ${formatMoney(s.config.threshold)} mark.`;
+    this.flavorEl.textContent = champ
+      ? 'A shameful path led them to seek it… but you delivered. Johnny Five Aces tips his hat.'
+      : pickLine(won ? WIN_LINES : LOSE_LINES, s.earnings);
     this.actionsEl.innerHTML =
-      (won && hasNext ? `<button class="btn" data-act="next">Next Shift ▸</button>` : '') +
-      `<button class="btn secondary" data-act="replay">Replay Shift</button>`;
-    if (!this.shown) {
-      this.shown = true;
-      this.el.classList.add('show');
-    }
+      (won && opts.hasNext ? `<button class="btn" data-act="next">Next Shift ▸</button>` : '') +
+      `<button class="btn secondary" data-act="replay">Replay</button>` +
+      `<button class="btn secondary" data-act="levelselect">Level Select</button>`;
+
+    this.shown = true;
+    this.el.classList.add('show');
   }
 }

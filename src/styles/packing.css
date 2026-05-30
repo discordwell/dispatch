@@ -48,6 +48,40 @@
   color: var(--parch-ink-soft);
   margin-left: 10px;
 }
+.pack-head-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ship-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ship-chip {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--parch-ink-soft);
+  background: rgba(40, 26, 16, 0.08);
+  border: 1px solid rgba(40, 26, 16, 0.28);
+}
+.ship-chip span {
+  opacity: 0.7;
+}
+.ship-chip:hover {
+  border-color: var(--brass-1);
+}
+.ship-chip.active {
+  color: #2b2018;
+  background: linear-gradient(180deg, var(--brass-3), var(--brass-1));
+  border-color: var(--brass-0);
+  font-weight: 700;
+}
+
 .pack-head .clock-wrap {
   text-align: right;
   line-height: 1.1;

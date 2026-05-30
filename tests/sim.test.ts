@@ -42,6 +42,7 @@ function baseState(over: Partial<GameState> = {}): GameState {
     outcome: 'playing',
     seed: 1,
     seq: 0,
+    events: [],
     ...over,
   };
 }
@@ -159,6 +160,25 @@ describe('sim.step', () => {
     const snapshot = s.earnings;
     step(s, 10_000);
     expect(s.earnings).toBe(snapshot);
+  });
+
+  it('emits a deliver event on arrival and an expire event when an active request lapses', () => {
+    const del = baseState({
+      ships: [flyingShip(500, 1000)],
+      requests: [
+        { id: 'r1', originId: 'a', destId: 'b', items: [], spawnAtMs: 0, expiresAtMs: 999_999, status: 'assigned', baseReward: 500 },
+      ],
+    });
+    step(del, 1000);
+    expect(del.events).toContainEqual({ type: 'deliver', cityId: 'b', amount: 500 });
+
+    const exp = baseState({
+      requests: [
+        { id: 'a1', originId: 'a', destId: 'b', items: [], spawnAtMs: 0, expiresAtMs: 1000, status: 'active', baseReward: 100 },
+      ],
+    });
+    step(exp, 1500);
+    expect(exp.events).toContainEqual({ type: 'expire', cityId: 'a' });
   });
 });
 

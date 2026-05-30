@@ -6,7 +6,7 @@ export const level5: LevelConfig = {
   rank: '♠♠♠♠♠',
   name: 'Five Aces',
   durationMs: 600_000,
-  threshold: 24_000,
+  threshold: 18_000,
   cityIds: [
     'zybourne',
     'clockhaven',

@@ -64,6 +64,7 @@ function stateWithOffer(): GameState {
     outcome: 'playing',
     seed: 1,
     seq: 0,
+    events: [],
   };
 }
 

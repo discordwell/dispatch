@@ -10,7 +10,7 @@ export const level1: LevelConfig = {
   rank: '♠',
   name: 'The Morning Mail',
   durationMs: 600_000,
-  threshold: 3500, // ~30% of perfect-play; tune against real (human-paced) playtests
+  threshold: 4500, // ~40% of the single-ship ceiling — a gentle ace-1 goal (packing-time model)
   cityIds: [
     'zybourne',
     'clockhaven',

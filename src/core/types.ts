@@ -155,6 +155,11 @@ export interface LevelConfig {
 
 export type Outcome = 'playing' | 'won' | 'lost';
 
+/** Transient one-frame signals emitted by the sim for UI feedback (drained each frame). */
+export type GameEvent =
+  | { type: 'deliver'; cityId: CityId; amount: number }
+  | { type: 'expire'; cityId: CityId };
+
 export interface GameState {
   levelIndex: number;
   config: LevelConfig;
@@ -168,4 +173,5 @@ export interface GameState {
   outcome: Outcome;
   seed: number;
   seq: number; // monotonic counter for deterministic id generation
+  events: GameEvent[]; // transient UI feedback signals; drained by the UI each frame
 }

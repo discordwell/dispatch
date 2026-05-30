@@ -3,8 +3,9 @@
 **Working title:** *Dispatch*
 **Tagline:** A zeppelin dispatcher in the cyber-world of the Zybourne Clock.
 **Host:** dispatch.discordwell.com
-**Status:** Design — pre-implementation (open questions in §9)
-**Last updated:** 2026-05-29
+**Status:** v1 built & deployed — full 5-level campaign (title/level-select, persistence,
+multi-ship, packing puzzle, NPC charters, audio/juice). Remaining work is playtest balance (§9).
+**Last updated:** 2026-05-30
 
 ---
 
@@ -159,13 +160,16 @@ Direction to be confirmed in planning (§9), but the leading concept:
 
 ---
 
-## 9. Open Questions (resolve in planning)
+## 9. Resolved decisions & remaining tuning
 
-1. **Scope of first build:** full 5 levels vs. a polished **vertical slice** (level 1 + full
-   core loop, architected so 2–5 drop in) vs. core-mechanic prototype first.
-2. **Tech stack:** vanilla TS + Canvas (simple static deploy) vs. a game engine (Phaser/Pixi)
-   vs. React + Canvas.
-3. **Art direction:** CRT/radar dispatch console vs. fuller painterly steampunk vs. clean
-   modern-flat with cyber accents.
-4. **Packing depth:** rotation only, or also mirror/flip? Any auto-pack assist? Efficiency
-   bonus on/off? How "hardcore" is the puzzle?
+**Resolved & built:** TS + Vite static deploy · painterly steampunk (procedural, no raster
+assets) · rotate **and** flip packing with a fill-% efficiency bonus, no auto-pack · all 5 ace
+tiers as data · multi-ship control · NPC charters · campaign progression + localStorage · audio.
+
+**Remaining (playtest tuning):**
+- **Thresholds** (L1 4500 / L2 9000 / L3 12000 / L4 15000 / L5 18000) were set from a
+  packing-time-aware estimator (≈ a rising % of the careful-play ceiling; charters add headroom).
+  Validate against real human-paced play; adjust spawn cadence / value-per-cell if a tier is off.
+- **NPC charters** are simplified: a booked charter flies wherever the request goes (the original
+  "fixed destination" framing was dropped for fun/clarity). Revisit if matching is desired.
+- Possible future: a tutorial hint on L1, more cargo/shape variety, leaderboards.

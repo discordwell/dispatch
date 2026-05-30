@@ -4,19 +4,21 @@ import { createGameState } from '../core/setup';
 import { screenToWorld } from '../render/viewport';
 import { pickAt, type Pick } from '../render/hitTest';
 import { beginPack, bookNpc, cancelPack, commitPack, idleShips, npcOfferNear } from '../state/actions';
-import type { Placement } from '../core/types';
+import { loadProgress, recordResult } from '../state/progress';
+import { initAudio, isMuted, resumeAudio, sfx, toggleMute } from '../audio';
+import type { GameState, Placement } from '../core/types';
 import { Hud } from './Hud';
 import { RequestBoard } from './RequestBoard';
 import { ShipInspector } from './ShipInspector';
 import { PackingOverlay } from './PackingOverlay';
 import { ResultOverlay } from './ResultOverlay';
-import { StartOverlay } from './StartOverlay';
+import { TitleScreen } from './TitleScreen';
 
 const MAX_LEVEL = 5;
 
 /**
- * Top-level UI controller. Owns selection, mounts every view, routes canvas clicks,
- * and re-syncs from the store each frame.
+ * Top-level UI controller. Owns selection + the campaign flow (title → shift → result),
+ * mounts every view, routes canvas clicks, and re-syncs from the store each frame.
  */
 export class GameUI {
   private selection: Pick | null = null;
@@ -25,8 +27,10 @@ export class GameUI {
   private inspector: ShipInspector;
   private overlay: PackingOverlay;
   private result: ResultOverlay;
-  private start: StartOverlay;
-  private begun = false;
+  private title: TitleScreen;
+  private begun = false; // false while the title screen is up (sim paused)
+  private recorded = false; // guard so a finished shift is persisted once
+  private packing: { reqId: string; shipId: string } | null = null;
 
   constructor(
     root: HTMLElement,
@@ -40,27 +44,81 @@ export class GameUI {
     this.overlay = new PackingOverlay(root, {
       onCommit: (reqId, shipId, placements) => this.commit(reqId, shipId, placements),
       onCancel: (reqId, shipId) => this.cancel(reqId, shipId),
+      onSwitch: (shipId) => this.switchShip(shipId),
     });
     this.result = new ResultOverlay(root, {
       onReplay: () => this.loadLevel(this.store.getState().levelIndex),
       onNext: () => this.loadLevel(Math.min(MAX_LEVEL, this.store.getState().levelIndex + 1)),
+      onLevelSelect: () => this.showTitle(),
     });
-    this.start = new StartOverlay(root, () => {
-      this.begun = true;
-      this.start.hide();
-      this.sync();
+    this.title = new TitleScreen(root, (idx) => this.loadLevel(idx));
+
+    const mute = document.createElement('button');
+    mute.className = 'mute-btn';
+    mute.textContent = isMuted() ? '🔇' : '🔊';
+    mute.title = 'Toggle sound';
+    mute.addEventListener('click', () => {
+      const m = toggleMute();
+      mute.textContent = m ? '🔇' : '🔊';
+      if (!m) {
+        initAudio();
+        resumeAudio();
+      }
     });
-    this.start.show(this.store.getState());
+    root.appendChild(mute);
+
     canvas.addEventListener('click', (e) => this.onCanvasClick(e));
+    this.showTitle();
   }
 
-  /** The loop advances sim time only after the player begins the first shift. */
+  /** Spawn map feedback + sound for the sim's transient events, then clear them. */
+  private drainEvents(s: GameState): void {
+    if (s.events.length === 0) return;
+    for (const e of s.events) {
+      const c = s.cities.find((city) => city.id === e.cityId);
+      if (!c) continue;
+      if (e.type === 'deliver') {
+        this.renderer.effectDeliver(c, e.amount);
+        sfx.deliver();
+      } else {
+        this.renderer.effectExpire(c);
+        sfx.expire();
+      }
+    }
+    s.events.length = 0;
+  }
+
+  /** The loop advances sim time only while a shift is in progress (not on the title screen). */
   isRunning(): boolean {
     return this.begun;
   }
 
+  private showTitle(): void {
+    this.begun = false;
+    this.result.hide();
+    if (this.overlay.isOpen()) this.overlay.close();
+    this.selection = null;
+    this.renderer.setSelection(null);
+    this.title.show(loadProgress());
+    this.sync();
+  }
+
+  private loadLevel(index: number): void {
+    initAudio(); // first reaches here via a user click (autoplay policy)
+    resumeAudio();
+    this.title.hide();
+    this.result.hide();
+    this.selection = null;
+    this.renderer.setSelection(null);
+    this.packing = null;
+    this.recorded = false;
+    this.begun = true;
+    this.store.reset(createGameState(index));
+    this.sync();
+  }
+
   private onCanvasClick(e: MouseEvent): void {
-    if (this.overlay.isOpen() || this.store.getState().outcome !== 'playing') return;
+    if (!this.begun || this.overlay.isOpen() || this.store.getState().outcome !== 'playing') return;
     const rect = this.canvas.getBoundingClientRect();
     const world = screenToWorld({ x: e.clientX - rect.left, y: e.clientY - rect.top }, this.renderer.transform);
     this.selection = pickAt(this.store.getState(), world);
@@ -68,16 +126,22 @@ export class GameUI {
     this.sync();
   }
 
-  /** Reserve a ship (idle owned, else a charter near the origin) and open the packing puzzle. */
+  /** Reserve a ship (the selected idle ship, else first idle owned, else a charter) and pack. */
   private openPacking(reqId: string): void {
     const s = this.store.getState();
-    const owned = idleShips(s)[0];
-    if (owned) {
+    const idle = idleShips(s).filter((sh) => sh.owned);
+    const sel = this.selection;
+    const selId = sel && sel.type === 'ship' ? sel.id : null;
+    const chosen = idle.find((sh) => sh.id === selId) ?? idle[0];
+    if (chosen) {
       let ok = false;
       this.store.update((st) => {
-        ok = beginPack(st, reqId, owned.id);
+        ok = beginPack(st, reqId, chosen.id);
       });
-      if (ok) this.overlay.open(this.store.getState(), reqId, owned.id);
+      if (ok) {
+        this.packing = { reqId, shipId: chosen.id };
+        this.overlay.open(this.store.getState(), reqId, chosen.id);
+      }
       this.sync();
       return;
     }
@@ -88,7 +152,26 @@ export class GameUI {
       this.store.update((st) => {
         shipId = bookNpc(st, offer.id, reqId);
       });
-      if (shipId) this.overlay.open(this.store.getState(), reqId, shipId);
+      if (shipId) {
+        this.packing = { reqId, shipId };
+        this.overlay.open(this.store.getState(), reqId, shipId);
+      }
+    }
+    this.sync();
+  }
+
+  /** Switch which idle owned ship loads the current request (cancel the reservation + re-reserve). */
+  private switchShip(newShipId: string): void {
+    if (!this.packing || this.packing.shipId === newShipId) return;
+    const { reqId, shipId } = this.packing;
+    let ok = false;
+    this.store.update((st) => {
+      cancelPack(st, reqId, shipId);
+      ok = beginPack(st, reqId, newShipId);
+    });
+    if (ok) {
+      this.packing = { reqId, shipId: newShipId };
+      this.overlay.open(this.store.getState(), reqId, newShipId);
     }
     this.sync();
   }
@@ -97,6 +180,8 @@ export class GameUI {
     this.store.update((st) => {
       commitPack(st, reqId, shipId, placements);
     });
+    sfx.dispatch();
+    this.packing = null;
     this.overlay.close();
     this.sync();
   }
@@ -105,29 +190,34 @@ export class GameUI {
     this.store.update((st) => {
       cancelPack(st, reqId, shipId);
     });
+    this.packing = null;
     this.overlay.close();
-    this.sync();
-  }
-
-  private loadLevel(index: number): void {
-    this.result.hide();
-    this.selection = null;
-    this.renderer.setSelection(null);
-    this.store.reset(createGameState(index));
     this.sync();
   }
 
   /** Pull every view from current state. Called each frame by the loop and after any action. */
   sync(): void {
     const s = this.store.getState();
+    this.drainEvents(s);
     this.renderer.render(s);
     this.hud.update(s);
 
+    if (!this.begun) return; // title screen up; map/HUD render behind it
+
     if (s.outcome !== 'playing') {
+      if (!this.recorded) {
+        recordResult(s.levelIndex, s.earnings, s.outcome === 'won');
+        this.recorded = true;
+        if (s.outcome === 'won') sfx.win();
+        else sfx.lose();
+      }
       if (this.overlay.isOpen()) this.overlay.close();
       this.board.hide();
       this.inspector.hide();
-      this.result.show(s, s.levelIndex < MAX_LEVEL);
+      this.result.show(s, {
+        hasNext: s.outcome === 'won' && s.levelIndex < MAX_LEVEL,
+        campaignComplete: s.outcome === 'won' && s.levelIndex === MAX_LEVEL,
+      });
       return;
     }
     this.result.hide();

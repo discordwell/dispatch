@@ -6,7 +6,7 @@ export const level3: LevelConfig = {
   rank: '♠♠♠',
   name: 'Brass Tempest',
   durationMs: 600_000,
-  threshold: 11000,
+  threshold: 12000,
   cityIds: [
     'zybourne',
     'clockhaven',

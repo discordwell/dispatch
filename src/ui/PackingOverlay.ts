@@ -2,6 +2,7 @@ import { boundingBox, orientedCells } from '../core/polyomino';
 import { buildOccupancy, canPlace, fillRatio, idx } from '../core/packing';
 import { computePayout, loadedValue } from '../core/payout';
 import type { GameState, Placement, PolyominoItem, Rotation } from '../core/types';
+import { sfx } from '../audio';
 import { formatClock, formatMoney } from './format';
 
 const CELL = 40;
@@ -16,6 +17,7 @@ interface Held {
 export interface PackingCallbacks {
   onCommit: (requestId: string, shipId: string, placements: Placement[]) => void;
   onCancel: (requestId: string, shipId: string) => void;
+  onSwitch: (shipId: string) => void;
 }
 
 /**
@@ -28,6 +30,7 @@ export class PackingOverlay {
   private frame: HTMLElement;
   private shipNameEl: HTMLElement;
   private holdEl: HTMLElement;
+  private shipSelectEl: HTMLElement;
   private clockEl: HTMLElement;
   private expiringEl: HTMLElement;
   private gridEl: HTMLElement;
@@ -58,7 +61,10 @@ export class PackingOverlay {
     el.innerHTML = `
       <div class="pack-frame">
         <div class="pack-head">
-          <div><span class="ship"></span><span class="hold"></span></div>
+          <div class="pack-head-left">
+            <div><span class="ship"></span><span class="hold"></span></div>
+            <div class="ship-select"></div>
+          </div>
           <div class="clock-wrap">
             <div class="pack-clock">0:00</div>
             <div class="pack-expiring"></div>
@@ -87,6 +93,7 @@ export class PackingOverlay {
     this.frame = el.querySelector('.pack-frame')!;
     this.shipNameEl = el.querySelector('.ship')!;
     this.holdEl = el.querySelector('.hold')!;
+    this.shipSelectEl = el.querySelector('.ship-select')!;
     this.clockEl = el.querySelector('.pack-clock')!;
     this.expiringEl = el.querySelector('.pack-expiring')!;
     this.gridEl = el.querySelector('.pack-grid')!;
@@ -121,6 +128,7 @@ export class PackingOverlay {
 
     this.shipNameEl.textContent = ship.shipClass;
     this.holdEl.textContent = `hold ${this.w} × ${this.h}`;
+    this.renderShipSelect(s, shipId);
     this.buildGrid();
     this.renderAll();
     this.open_ = true;
@@ -144,6 +152,21 @@ export class PackingOverlay {
       (r) => r.status === 'active' && r.expiresAtMs - s.clockMs < 15_000,
     ).length;
     this.expiringEl.textContent = expiring > 0 ? `${expiring} request${expiring > 1 ? 's' : ''} expiring!` : '';
+  }
+
+  /** Chips to switch which idle owned ship loads this request (hidden if only one option). */
+  private renderShipSelect(s: GameState, activeId: string): void {
+    const eligible = s.ships.filter((sh) => (sh.owned && sh.status === 'idle') || sh.id === activeId);
+    if (eligible.length <= 1) {
+      this.shipSelectEl.innerHTML = '';
+      return;
+    }
+    this.shipSelectEl.innerHTML = eligible
+      .map(
+        (sh) =>
+          `<button class="ship-chip ${sh.id === activeId ? 'active' : ''}" data-ship="${sh.id}">${sh.shipClass} <span>${sh.holdW}×${sh.holdH}</span></button>`,
+      )
+      .join('');
   }
 
   // ── setup / rendering ────────────────────────────────────────────────────────
@@ -302,6 +325,7 @@ export class PackingOverlay {
       const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-item]');
       if (!chip || this.held) return;
       this.held = { itemId: chip.dataset.item!, rot: 0, flipped: false };
+      sfx.pickup();
       this.renderTray();
       this.renderGhost();
       this.tint();
@@ -315,6 +339,11 @@ export class PackingOverlay {
     });
 
     this.frame.addEventListener('click', (e) => {
+      const shipBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-ship]');
+      if (shipBtn) {
+        this.cb.onSwitch(shipBtn.dataset.ship!);
+        return;
+      }
       const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
       if (!btn) return;
       const act = btn.dataset.act;
@@ -346,6 +375,7 @@ export class PackingOverlay {
         }
         this.placed.set(this.held.itemId, { itemId: this.held.itemId, rot: this.held.rot, flipped: this.held.flipped, origin: cell });
         this.held = null;
+        sfx.place();
         this.renderAll();
       }
       return;
@@ -356,6 +386,7 @@ export class PackingOverlay {
       const p = this.placed.get(owner)!;
       this.placed.delete(owner);
       this.held = { itemId: owner, rot: p.rot, flipped: p.flipped };
+      sfx.pickup();
       this.renderAll();
     }
   }
@@ -374,12 +405,14 @@ export class PackingOverlay {
   private rotateHeld(): void {
     if (!this.held) return;
     this.held.rot = (((this.held.rot + 1) % 4) as Rotation);
+    sfx.rotate();
     this.renderGhost();
     this.tint();
   }
   private flipHeld(): void {
     if (!this.held) return;
     this.held.flipped = !this.held.flipped;
+    sfx.flip();
     this.renderGhost();
     this.tint();
   }

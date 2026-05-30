@@ -7,6 +7,24 @@ Newest session summaries on top (keep 20; overflow → `oldpad.md`). Key Finding
 
 ## Session Summaries
 
+### 2026-05-30T23:10Z — Full game build-out (post-slice)
+- Goal from user: "continue to build the entire game end to end." Built the complete game on top
+  of the deployed slice (57 vitest tests green; build clean; hard wet-tested in browser):
+  - **Multi-ship control:** packing overlay has a ship selector (chips) to pick/switch which idle
+    owned ship loads a request (cancel+begin+reopen, re-keys the hold). Verified Hauler↔Scout on L2.
+  - **Campaign meta:** `TitleScreen` (level-select grid, locked/unlocked, best scores) + `state/
+    progress.ts` (localStorage, pure `applyResult` tested) + "Five Aces" campaign-complete result.
+    Verified: win L1 → unlock L2, best §5,200 saved, Level Select reflects it.
+  - **Juice + audio:** `audio.ts` (procedural WebAudio SFX, mute toggle persisted, resumes on
+    click) wired to pickup/place/rotate/flip/dispatch/deliver/win/lose. `render/effects.ts`
+    payout float-ups + delivery rings; expiring-request badge pulse. Sim emits `events[]`
+    (deliver/expire), drained by GameUI each frame. Verified float-ups render.
+  - **Balance:** packing-time-aware estimator (dispatcher packs one ship at a time). New thresholds
+    L1 4500 / L2 9000 / L3 12000 / L4 15000 / L5 18000 (rising % of careful-play ceiling; charters
+    give headroom). `levels.test` now asserts each level winnable under careful-gated greedy.
+  - Still **playtest-tune** thresholds against real human play; charters remain simplified (fly
+    anywhere, not fixed-destination).
+
 ### 2026-05-30T04:41Z — Kickoff → M4 (core loop playable)
 - New project. Wrote `GAME_DESIGN.md` (full design) and researched the Zybourne Clock aesthetic
   (steampunk + time-travel, ~A.D. 2351–2381, dirigibles are canon, Johnny Five Aces → the 1–5

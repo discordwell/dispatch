@@ -85,6 +85,22 @@ re-normalize (translate to origin + sort) so equality/dedup is well-defined. Hol
 bounds + overlap. Payout = loaded value + `BONUS_MAX·smoothstep(fill, FILL_FLOOR, 1)`, then the NPC
 fee for booked ships. Partial loads are allowed; choosing the best-value subset is the puzzle.
 
+## Campaign, feedback & audio (full game)
+
+- **Campaign flow** lives in `GameUI`: `TitleScreen` (level-select grid) → shift → `ResultOverlay`
+  (win/lose, or a "Five Aces" campaign-complete variant). `state/progress.ts` persists unlocked
+  tier + best earnings to `localStorage` (pure `applyResult` is unit-tested; load/save wrap it).
+  The loop is gated by `GameUI.isRunning()` so sim time only advances during a shift.
+- **Multi-ship:** `PackingOverlay` shows ship-selector chips; switching cancels the current
+  reservation and re-reserves the chosen idle owned ship (`GameUI.switchShip`), re-keying the hold.
+- **Feedback channel:** `sim.step` appends transient `GameState.events` (`deliver`/`expire`);
+  `GameUI.sync` drains them each frame into `render/effects.ts` (payout float-ups, delivery rings)
+  and `audio.ts` SFX. City badges pulse when a request is about to expire. `events` is capped so
+  headless runs that never drain it don't grow unbounded.
+- **Audio (`audio.ts`):** procedural WebAudio blips, no asset files; lazily created and resumed on
+  a user gesture (autoplay policy); mute persisted. Added modules: `src/audio.ts`,
+  `src/render/effects.ts`, `src/state/progress.ts`, `src/ui/TitleScreen.ts`.
+
 ## Build & deploy
 
 `npm run build` → `tsc --noEmit` typecheck + Vite bundle to `dist/`. `scripts/deploy.sh` rsyncs

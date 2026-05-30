@@ -3,6 +3,7 @@ import type { GameState, Vec2 } from '../core/types';
 import { COL, paintAirship, paintCity, paintParchment, paintRoutePath, paintScreenBackground } from './paint';
 import { computeTransform, shipAnchor, type Transform } from './viewport';
 import type { Pick } from './hitTest';
+import { Effects } from './effects';
 
 export class MapRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -11,6 +12,7 @@ export class MapRenderer {
   private cssH = 0;
   transform: Transform = { scale: 1, ox: 0, oy: 0 };
   selected: Pick | null = null;
+  private effects = new Effects();
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -34,6 +36,13 @@ export class MapRenderer {
     this.selected = sel;
   }
 
+  effectDeliver(p: Vec2, amount: number): void {
+    this.effects.deliver(p, amount, performance.now());
+  }
+  effectExpire(p: Vec2): void {
+    this.effects.expire(p, performance.now());
+  }
+
   render(s: GameState): void {
     const ctx = this.ctx;
     const { cssW, cssH, dpr } = this;
@@ -50,11 +59,16 @@ export class MapRenderer {
 
     paintParchment(ctx);
 
-    // active-request counts per origin city
+    // active-request counts (+ urgency) per origin city
     const counts = new Map<string, number>();
+    const urgent = new Set<string>();
     for (const r of s.requests) {
-      if (r.status === 'active') counts.set(r.originId, (counts.get(r.originId) ?? 0) + 1);
+      if (r.status === 'active') {
+        counts.set(r.originId, (counts.get(r.originId) ?? 0) + 1);
+        if (r.expiresAtMs - s.clockMs < 15_000) urgent.add(r.originId);
+      }
     }
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
 
     // routes (beneath nodes)
     for (const ship of s.ships) {
@@ -92,6 +106,8 @@ export class MapRenderer {
         hub: c.id === hubId,
         activeCount: counts.get(c.id) ?? 0,
         selected: sel?.type === 'city' && sel.id === c.id,
+        urgent: urgent.has(c.id),
+        pulse,
       });
     }
 
@@ -112,5 +128,8 @@ export class MapRenderer {
         loading: ship.status === 'loading',
       });
     }
+
+    // transient feedback (payout float-ups, delivery rings) atop the map
+    this.effects.render(ctx, performance.now());
   }
 }

@@ -41,6 +41,7 @@ export function createGameState(levelIndex: number): GameState {
     outcome: 'playing',
     seed: level.seed,
     seq: 0,
+    events: [],
   };
   refreshNpcOffers(state); // seed the initial charter roster at clock 0
   return state;

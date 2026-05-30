@@ -223,6 +223,66 @@
   font-family: var(--font-display);
 }
 
+/* title / level select */
+.title-card {
+  width: min(660px, 94vw);
+}
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 20px 0 10px;
+}
+.level-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--parch-ink);
+  background: linear-gradient(180deg, rgba(255, 250, 232, 0.6), rgba(201, 180, 138, 0.3));
+  border: 1.5px solid rgba(40, 26, 16, 0.3);
+  transition: transform 0.06s ease, border-color 0.1s ease;
+}
+.level-card:hover:not(.locked) {
+  border-color: var(--brass-1);
+  transform: translateY(-1px);
+}
+.level-card.locked {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+.lc-rank {
+  color: var(--brass-0);
+  letter-spacing: 2px;
+  font-size: 1rem;
+}
+.lc-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.lc-goal {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--parch-ink-soft);
+}
+.lc-best {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--brass-0);
+}
+.title-hint {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--parch-ink-soft);
+  margin-top: 6px;
+}
+
 /* ship inspector rows */
 .kv {
   display: flex;

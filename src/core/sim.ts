@@ -70,6 +70,7 @@ export function step(s: GameState, dtMs: number): void {
       r.status = r.expiresAtMs <= now ? 'expired' : 'active';
     } else if (r.status === 'active' && r.expiresAtMs <= now) {
       r.status = 'expired';
+      s.events.push({ type: 'expire', cityId: r.originId });
     }
   }
 
@@ -93,6 +94,9 @@ export function step(s: GameState, dtMs: number): void {
     s.ships = s.ships.filter((sh) => sh.owned || sh.status !== 'idle' || !!sh.route);
   }
 
+  // Cap the transient event buffer in case the UI isn't draining (headless runs).
+  if (s.events.length > 120) s.events.splice(0, s.events.length - 120);
+
   if (s.clockMs >= s.config.durationMs) {
     s.outcome = s.earnings >= s.config.threshold ? 'won' : 'lost';
   }
@@ -104,6 +108,7 @@ function arrive(s: GameState, ship: Airship): void {
 
   if (route.purpose === 'deliver' && ship.cargo) {
     s.earnings += ship.cargo.payout;
+    s.events.push({ type: 'deliver', cityId: route.destId, amount: ship.cargo.payout });
     const req = s.requests.find((r) => r.id === ship.cargo?.requestId);
     if (req) req.status = 'delivered';
   }

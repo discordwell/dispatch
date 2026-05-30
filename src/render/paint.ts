@@ -114,6 +114,8 @@ export interface CityPaintOpts {
   hub: boolean;
   activeCount: number;
   selected: boolean;
+  urgent: boolean;
+  pulse: number; // 0..1, for pulsing the badge when a request is about to expire
 }
 
 export function paintCity(ctx: CanvasRenderingContext2D, c: { name: string; x: number; y: number }, o: CityPaintOpts): void {
@@ -174,14 +176,15 @@ export function paintCity(ctx: CanvasRenderingContext2D, c: { name: string; x: n
   ctx.fillStyle = COL.parchInk;
   ctx.fillText(c.name, c.x, ly);
 
-  // active-request badge
+  // active-request badge (pulses red when a request is about to expire)
   if (o.activeCount > 0) {
     const bx = c.x + R + 2;
     const by = c.y - R - 2;
-    ctx.fillStyle = COL.danger;
-    ctx.shadowColor = 'rgba(168,50,50,0.7)';
-    ctx.shadowBlur = 8;
-    disc(ctx, bx, by, 9);
+    const urg = o.urgent ? o.pulse : 0;
+    ctx.fillStyle = o.urgent ? COL.dangerHi : COL.danger;
+    ctx.shadowColor = 'rgba(224,101,79,0.85)';
+    ctx.shadowBlur = 8 + urg * 14;
+    disc(ctx, bx, by, 9 + urg * 2.5);
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.strokeStyle = COL.brassHi;
