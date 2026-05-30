@@ -6,7 +6,7 @@ export const level2: LevelConfig = {
   rank: '♠♠',
   name: 'Two Winds',
   durationMs: 600_000,
-  threshold: 9000,
+  threshold: 11000, // ~0.52× a careful multi-load run (~21k)
   cityIds: [
     'loading-bay',
     'the-slums',

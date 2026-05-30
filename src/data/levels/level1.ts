@@ -10,7 +10,7 @@ export const level1: LevelConfig = {
   rank: '♠',
   name: 'The Morning Mail',
   durationMs: 600_000,
-  threshold: 4500, // ~40% of the single-ship ceiling — a gentle ace-1 goal (packing-time model)
+  threshold: 5500, // ~0.57× a careful multi-load run (~9.7k); gentle ace-1 goal. See measure-balance harness.
   cityIds: [
     'loading-bay',
     'the-slums',

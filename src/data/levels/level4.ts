@@ -6,7 +6,7 @@ export const level4: LevelConfig = {
   rank: '♠♠♠♠',
   name: 'The Gauntlet',
   durationMs: 600_000,
-  threshold: 15000,
+  threshold: 19000, // ~0.69× a careful multi-load run (~27.5k)
   cityIds: [
     'loading-bay',
     'the-slums',

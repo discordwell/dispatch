@@ -6,7 +6,7 @@ export const level5: LevelConfig = {
   rank: '♠♠♠♠♠',
   name: 'Five Aces',
   durationMs: 600_000,
-  threshold: 18_000,
+  threshold: 23000, // ~0.82× a careful multi-load run (~28k) — the dispatcher-bound finale; brisk play required
   cityIds: [
     'loading-bay',
     'the-slums',
