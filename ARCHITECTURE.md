@@ -88,12 +88,16 @@ fee for booked ships. Partial loads are allowed; choosing the best-value subset 
 
 ## Map & multi-load milk-run
 
-- **Map:** the world is the **Zybourne City** raster (`src/assets/zybourne-city.png`, 765×600), drawn
-  by `paint.paintCityMap` inside the procedural brass frame. `MapRenderer.knockOutWhiteBackground`
-  flood-fills the source GIF's flat white surround to transparent at load (edge-contiguous only, so
-  interior label fills survive) and the sepia panel shows behind the city silhouette. Map units = image
-  pixels. The 12 nodes in `data/cities.ts` are **docks** over the districts; the `City` type / `cityId`
-  are unchanged internally (a "city" now models a dock).
+- **Map:** the world is the **Zybourne City** raster (`src/assets/zybourne-city.png`) — a 1416×1111
+  **text-free** render (the original's baked-in district labels were removed via ChatGPT; dock names
+  now come solely from the brass nameplates), drawn by `paint.paintCityMap` **scaled into** the
+  `MAP_W×MAP_H` = **765×600** map-unit rect inside the procedural brass frame.
+  `MapRenderer.knockOutWhiteBackground` flood-fills the raster's flat white surround to transparent at
+  load (edge-contiguous from the borders, so interior whites survive) and the sepia panel shows behind
+  the city silhouette. Map units stay 765×600 — dock coordinates live in that space; the higher-res
+  asset just renders crisper. The 12 nodes in `data/cities.ts` are **docks** over the districts, each
+  **named for the locale it sits in** (e.g. Tenement Junction in the slums, Market Cross in the
+  commercial district); the `City` type / `cityId` are unchanged internally (a "city" now models a dock).
 - **Loading is dock-scoped, not request-scoped.** `beginLoad(dockId, shipId)` reserves a ship to load a
   dock; `PackingOverlay` offers every active order at that dock, grouped/colored by destination, and the
   player packs any subset into one hold. `commitLoad(shipId, placements)` groups placements by request

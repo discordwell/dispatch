@@ -10,9 +10,9 @@ export const level4: LevelConfig = {
   shipSpeed: 21,
   cityIds: [
     'loading-bay',
-    'the-slums',
-    'commercial-quay',
-    'uptown-heights',
+    'tenement-junction',
+    'market-cross',
+    'highgate-terrace',
     'clocktower-plaza',
     'garrison-keep',
     'cog-junction',

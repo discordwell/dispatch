@@ -9,7 +9,7 @@ import cityMapUrl from '../assets/zybourne-city.png';
 /**
  * Make the map's flat white surround transparent by flood-filling near-white from the
  * border inward, so the sepia panel shows behind the city instead of a bright rectangle.
- * Edge-contiguous only → interior white (e.g. the printed district-label fills) is preserved.
+ * Edge-contiguous only → interior white (e.g. light building/fountain fills) is preserved.
  * Falls back to the raw image if the canvas read fails.
  */
 function knockOutWhiteBackground(img: HTMLImageElement): CanvasImageSource {

@@ -7,6 +7,12 @@ Newest session summaries on top (keep 20; overflow → `oldpad.md`). Key Finding
 
 ## Session Summaries
 
+### 2026-05-31T01:00Z — Text-free regenerated map + station-style dock names
+- User had ChatGPT regenerate the city map with the baked-in district labels removed (in the **browser**, via their ChatGPT session — they corrected an initial attempt of mine to use the OpenAI API CLI) and asked to (a) use it as the background and (b) rename docks so each name reflects the **locale it sits in** (station-style, not bare district labels). Build clean, 77 tests green, wet-tested on the dev server (no console errors), redeployed.
+- **Asset:** replaced `src/assets/zybourne-city.png` with the text-free render (**1416×1111**, pngquant'd 1.7 MB → 674 KB). Same composition as the old 765×600 → **all 12 dock coords still line up** unchanged. `paintCityMap` draws it scaled into the 765×600 map-unit rect; `knockOutWhiteBackground` still clears the white surround cleanly (verified — no edge halo). Map units stay 765×600 (asset just renders crisper).
+- **Dock renames (id + name):** the three bare district-label docks → locale station names: `the-slums`→`tenement-junction` "Tenement Junction", `commercial-quay`→`market-cross` "Market Cross", `uptown-heights`→`highgate-terrace` "Highgate Terrace". Kept the already-evocative clockwork names (Loading Bay, Clocktower Plaza, Cog Junction, Garrison Keep, Sprocket Row, Gearford Wall, Brass Gate, Aether Pier, Tinker's End). Updated all 5 level `cityIds`; `levels.test` (`cityExists`) + `requestGen.test` (`getCity`) validate the renames — no new test needed (existing guards cover it).
+- Focused self-review instead of the full subagent (small, fully verified diff): swept for old-name/id stragglers, refreshed the now-stale "765×600 GIF / printed district-label" notes in `ARCHITECTURE.md` + the `knockOutWhiteBackground` comment.
+
 ### 2026-05-31T00:17Z — Much slower per-level cruise + Send-to-dock reposition
 - User asks: cruise speed ~1/3–1/2 of before, slower for later levels; and let you send your own airships to a dock. 77 tests green, build clean, wet-tested live, redeployed.
 - **Speed is now per-level.** Removed global `config.SHIP_SPEED`/`NPC_SPEED`; added `LevelConfig.shipSpeed` (owned cruise: **L1 30 → L5 18**, ramping down — was a flat 48) + `config.CHARTER_SPEED_MULT` 1.15. `buildMilkRun`/`reposition` read `s.config.shipSpeed`; charters × the mult. (A cross-map hop is now ~16s.)
