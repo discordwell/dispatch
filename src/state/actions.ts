@@ -73,6 +73,33 @@ export function cancelLoad(s: GameState, shipId: string): void {
 }
 
 /**
+ * Send an idle owned ship empty to a dock (pre-positioning — handy now that ships cruise slowly).
+ * It flies cargo-less and idles on arrival; `sim.advanceStops` handles the no-hold route. Returns
+ * false if the ship isn't an idle owned ship, the dock is unknown, or it's already there.
+ */
+export function reposition(s: GameState, shipId: string, dockId: string): boolean {
+  const ship = findShip(s, shipId);
+  const dock = findCity(s, dockId);
+  if (!ship || !dock || !ship.owned || ship.status !== 'idle') return false;
+  if (ship.locationId === dockId) return false;
+  const from = { x: ship.pos.x, y: ship.pos.y };
+  const speed = Math.max(1, s.config.shipSpeed);
+  const arriveAtMs = s.clockMs + travelTimeMs(distance(from, dock), speed);
+  ship.route = {
+    originId: ship.locationId,
+    from,
+    stops: [{ cityId: dockId, pos: { x: dock.x, y: dock.y }, arriveAtMs }],
+    nextStopIndex: 0,
+    departedAtMs: s.clockMs,
+    arriveAtMs,
+    purpose: 'reposition',
+  };
+  ship.status = 'repositioning';
+  ship.locationId = null;
+  return true;
+}
+
+/**
  * Finalize a load and dispatch the ship on a multi-stop milk-run. `placements` may mix
  * items from several of the dock's active orders; each contributing order becomes a lot,
  * auto-unloaded (and paid) when the ship reaches its destination. Returns false if the
@@ -169,8 +196,9 @@ export function splitNet(net: number, values: number[]): number[] {
  */
 function buildMilkRun(s: GameState, ship: Airship, dockId: string, lots: CargoLot[], now: number): Route {
   const from = { x: ship.pos.x, y: ship.pos.y };
-  // guard > 0 so travelTimeMs can't yield Infinity → NaN positions / a ship that never arrives
-  const speed = Math.max(1, ship.owned ? config.SHIP_SPEED : config.NPC_SPEED);
+  // per-level owned cruise; charters fly a bit faster. guard > 0 so travelTimeMs stays finite.
+  const base = s.config.shipSpeed;
+  const speed = Math.max(1, ship.owned ? base : base * config.CHARTER_SPEED_MULT);
   const dock = findCity(s, dockId);
 
   // nearest-neighbour order the distinct destinations, starting from the dock

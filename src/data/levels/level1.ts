@@ -10,7 +10,8 @@ export const level1: LevelConfig = {
   rank: '♠',
   name: 'The Morning Mail',
   durationMs: 600_000,
-  threshold: 5000, // ~0.55× a careful multi-load run (~9k) at the slower cruise; gentle ace-1 goal. See measure-balance.ts.
+  threshold: 4000, // ~0.6× a careful run (~6.6k) at the slow cruise; gentle ace-1 goal. See measure-balance.ts.
+  shipSpeed: 30,
   cityIds: [
     'loading-bay',
     'the-slums',

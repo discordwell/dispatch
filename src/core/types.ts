@@ -57,7 +57,7 @@ export interface ShipClass {
   charterCost: number; // fixed fee to charter a hull of this class (owned ships are free)
 }
 
-// 'repositioning' is reserved (nothing sets it yet — deadheading is a real pickup stop now).
+// 'repositioning' = an owned ship flying empty to a dock (set by actions.reposition).
 export type ShipStatus = 'idle' | 'loading' | 'flying' | 'repositioning';
 
 /** One stop on a multi-stop route: a dock the ship reaches at a known time. */
@@ -161,6 +161,7 @@ export interface LevelConfig {
   name: string;
   durationMs: number;
   threshold: number;
+  shipSpeed: number; // owned-ship cruise (map units/sec) for this level; later levels are slower
   cityIds: CityId[];
   ownedShips: { shipClass: string }[];
   npc: NpcConfig;

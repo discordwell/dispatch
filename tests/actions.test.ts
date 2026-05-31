@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { beginLoad, commitLoad, bookNpc, splitNet } from '../src/state/actions';
+import { beginLoad, commitLoad, bookNpc, reposition, splitNet } from '../src/state/actions';
+import { step } from '../src/core/sim';
 import type {
   Airship,
   DeliveryRequest,
@@ -16,6 +17,7 @@ const cfg: LevelConfig = {
   name: 'test',
   durationMs: 600_000,
   threshold: 1000,
+  shipSpeed: 48,
   cityIds: [],
   ownedShips: [],
   npc: { enabled: false, spawnDistance: 0 },
@@ -236,5 +238,42 @@ describe('bookNpc', () => {
     expect(sh.owned).toBe(false);
     expect(sh.status).toBe('loading');
     expect(sh.loadingDockId).toBe('d');
+  });
+});
+
+describe('reposition', () => {
+  it('sends an idle owned ship empty to a dock, idling there on arrival', () => {
+    const ship = haulerAt('d', 0, 0);
+    const s = baseState({ ships: [ship] });
+    expect(reposition(s, 's1', 'a')).toBe(true);
+    expect(ship.status).toBe('repositioning');
+    expect(ship.route!.purpose).toBe('reposition');
+    expect(ship.route!.stops.map((st) => st.cityId)).toEqual(['a']);
+    expect(ship.hold).toBeUndefined(); // flies empty — no cargo, no payout
+    step(s, 60_000);
+    expect(ship.status).toBe('idle');
+    expect(ship.locationId).toBe('a');
+    expect(s.earnings).toBe(0);
+  });
+
+  it('a repositioned owned ship is never reaped and emits no events', () => {
+    const ship = haulerAt('d', 0, 0);
+    const s = baseState({ ships: [ship] });
+    reposition(s, 's1', 'a');
+    step(s, 60_000);
+    expect(s.ships.some((sh) => sh.id === 's1')).toBe(true); // owned → the charter-reaper skips it
+    expect(s.events).toHaveLength(0); // flew empty: no deliver/expire
+  });
+
+  it('rejects a charter, a busy ship, an unknown dock, or a no-op move', () => {
+    const ship = haulerAt('d', 0, 0);
+    const s = baseState({ ships: [ship] });
+    expect(reposition(s, 's1', 'nope')).toBe(false); // unknown dock
+    expect(reposition(s, 's1', 'd')).toBe(false); // already there
+    ship.owned = false;
+    expect(reposition(s, 's1', 'a')).toBe(false); // charters can't be repositioned
+    ship.owned = true;
+    ship.status = 'flying';
+    expect(reposition(s, 's1', 'a')).toBe(false); // busy
   });
 });

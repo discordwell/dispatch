@@ -166,6 +166,34 @@
   box-shadow: 0 1px 0 #1f4a40, inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
+/* ship inspector "Send to dock" action */
+.inspect-actions {
+  margin-top: 10px;
+}
+
+/* Send-to-dock prompt banner */
+.reposition-banner {
+  position: fixed;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-panels);
+  display: none;
+  padding: 8px 18px;
+  border-radius: 9px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  color: var(--parch-2);
+  background: linear-gradient(180deg, rgba(36, 24, 14, 0.95), rgba(20, 13, 6, 0.95));
+  border: 2px solid transparent;
+  border-image: linear-gradient(180deg, var(--brass-3), var(--brass-0)) 1;
+  box-shadow: var(--frame-shadow);
+}
+.reposition-banner.show {
+  display: block;
+}
+
 /* result overlay */
 .result-overlay {
   position: fixed;

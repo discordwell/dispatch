@@ -13,8 +13,9 @@ export class ShipInspector {
   private title: HTMLElement;
   private sub: HTMLElement;
   private body: HTMLElement;
+  private shipId = '';
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, private cb: { onSend: (shipId: string) => void }) {
     const el = document.createElement('div');
     el.className = 'panel';
     el.innerHTML = `
@@ -28,6 +29,9 @@ export class ShipInspector {
     this.title = el.querySelector('.panel-title')!;
     this.sub = el.querySelector('.panel-sub')!;
     this.body = el.querySelector('.panel-body')!;
+    this.body.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-send]')) this.cb.onSend(this.shipId);
+    });
   }
 
   hide(): void {
@@ -41,6 +45,7 @@ export class ShipInspector {
       return;
     }
     this.el.classList.add('show');
+    this.shipId = shipId;
     const nameOf = (id: string | null) => (id ? (s.cities.find((c) => c.id === id)?.name ?? id) : '—');
 
     this.title.textContent = ship.shipClass;
@@ -50,10 +55,10 @@ export class ShipInspector {
       ['Status', STATUS_LABEL[ship.status] ?? ship.status],
       ['Hold', `${ship.holdW} × ${ship.holdH}`],
     ];
-    if (ship.status === 'flying' && ship.route) {
+    if ((ship.status === 'flying' || ship.status === 'repositioning') && ship.route) {
       const route = ship.route;
       const remaining = route.stops.slice(route.nextStopIndex);
-      rows.push(['Stops', remaining.map((st) => nameOf(st.cityId)).join(' → ') || '—']);
+      rows.push([ship.status === 'repositioning' ? 'Heading to' : 'Stops', remaining.map((st) => nameOf(st.cityId)).join(' → ') || '—']);
       const next = remaining[0];
       if (next) rows.push(['Next ETA', formatCountdown(next.arriveAtMs - s.clockMs)]);
       if (ship.hold) {
@@ -67,8 +72,13 @@ export class ShipInspector {
     }
     if (!ship.owned) rows.push(['Charter (one trip)', formatMoney(ship.charterCost)]);
 
-    this.body.innerHTML = rows
-      .map(([k, v]) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`)
-      .join('');
+    const send =
+      ship.owned && ship.status === 'idle'
+        ? `<div class="inspect-actions"><button class="btn secondary" data-send>Send to dock…</button></div>`
+        : '';
+    this.body.innerHTML =
+      rows
+        .map(([k, v]) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`)
+        .join('') + send;
   }
 }

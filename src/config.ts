@@ -10,8 +10,8 @@ export const config = {
   // --- Map / motion (map units == Zybourne City map pixels: 765x600) ---
   MAP_W: 765,
   MAP_H: 600,
-  SHIP_SPEED: 48, // owned-ship cruise speed, map units per second (a measured pace over the city)
-  NPC_SPEED: 56, // chartered ships fly a little faster
+  // Owned cruise speed is per-level (LevelConfig.shipSpeed) and ramps down across the campaign.
+  CHARTER_SPEED_MULT: 1.15, // chartered hulls fly this much faster than the level's owned cruise
 
   // --- Payout ---
   BONUS_MAX: 0.5, // efficiency bonus caps at +50% of loaded value on a perfectly full hold

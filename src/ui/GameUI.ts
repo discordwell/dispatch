@@ -3,7 +3,7 @@ import type { MapRenderer } from '../render/MapRenderer';
 import { createGameState } from '../core/setup';
 import { screenToWorld } from '../render/viewport';
 import { pickAt, type Pick } from '../render/hitTest';
-import { beginLoad, bookNpc, cancelLoad, commitLoad, idleShips } from '../state/actions';
+import { beginLoad, bookNpc, cancelLoad, commitLoad, idleShips, reposition } from '../state/actions';
 import { loadProgress, recordResult } from '../state/progress';
 import { initAudio, isMuted, resumeAudio, sfx, toggleMute } from '../audio';
 import type { GameState, Placement } from '../core/types';
@@ -31,6 +31,8 @@ export class GameUI {
   private begun = false; // false while the title screen is up (sim paused)
   private recorded = false; // guard so a finished shift is persisted once
   private loading: { dockId: string; shipId: string } | null = null;
+  private reposExpecting: string | null = null; // shipId awaiting a destination dock (Send-to-dock mode)
+  private reposBanner: HTMLElement;
 
   constructor(
     root: HTMLElement,
@@ -43,7 +45,7 @@ export class GameUI {
       onLoadDock: (cityId) => this.openLoading(cityId),
       onHire: (offerId) => this.hireCharter(offerId),
     });
-    this.inspector = new ShipInspector(root);
+    this.inspector = new ShipInspector(root, { onSend: (shipId) => this.beginReposition(shipId) });
     this.overlay = new PackingOverlay(root, {
       onCommit: (shipId, placements) => this.commit(shipId, placements),
       onCancel: (shipId) => this.cancel(shipId),
@@ -70,8 +72,34 @@ export class GameUI {
     });
     root.appendChild(mute);
 
+    const banner = document.createElement('div');
+    banner.className = 'reposition-banner';
+    banner.textContent = 'Click a destination dock to send your airship · Esc to cancel';
+    root.appendChild(banner);
+    this.reposBanner = banner;
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.reposExpecting) {
+        this.clearRepos();
+        this.sync();
+      }
+    });
+
     canvas.addEventListener('click', (e) => this.onCanvasClick(e));
     this.showTitle();
+  }
+
+  /** Enter Send-to-dock mode for an idle owned ship; the next dock click repositions it. */
+  private beginReposition(shipId: string): void {
+    const ship = this.store.getState().ships.find((sh) => sh.id === shipId);
+    if (!ship || !ship.owned || ship.status !== 'idle') return;
+    this.reposExpecting = shipId;
+    this.reposBanner.classList.add('show');
+  }
+
+  private clearRepos(): void {
+    this.reposExpecting = null;
+    this.reposBanner.classList.remove('show');
   }
 
   /** Spawn map feedback + sound for the sim's transient events, then clear them. */
@@ -99,6 +127,7 @@ export class GameUI {
   private showTitle(): void {
     this.begun = false;
     this.result.hide();
+    this.clearRepos();
     if (this.overlay.isOpen()) this.overlay.close();
     this.selection = null;
     this.renderer.setSelection(null);
@@ -111,6 +140,7 @@ export class GameUI {
     resumeAudio();
     this.title.hide();
     this.result.hide();
+    this.clearRepos();
     this.selection = null;
     this.renderer.setSelection(null);
     this.loading = null;
@@ -124,7 +154,24 @@ export class GameUI {
     if (!this.begun || this.overlay.isOpen() || this.store.getState().outcome !== 'playing') return;
     const rect = this.canvas.getBoundingClientRect();
     const world = screenToWorld({ x: e.clientX - rect.left, y: e.clientY - rect.top }, this.renderer.transform);
-    this.selection = pickAt(this.store.getState(), world);
+    const pick = pickAt(this.store.getState(), world);
+
+    if (this.reposExpecting) {
+      const shipId = this.reposExpecting;
+      this.clearRepos();
+      if (pick?.type === 'city') {
+        this.store.update((st) => {
+          reposition(st, shipId, pick.id);
+        });
+        this.selection = { type: 'ship', id: shipId }; // keep it selected → inspector shows it heading out
+        this.renderer.setSelection(this.selection);
+        this.sync();
+        return;
+      }
+      // clicked off a dock → cancel the send and fall through to a normal selection
+    }
+
+    this.selection = pick;
     this.renderer.setSelection(this.selection);
     this.sync();
   }
@@ -225,6 +272,7 @@ export class GameUI {
     if (!this.begun) return; // title screen up; map/HUD render behind it
 
     if (s.outcome !== 'playing') {
+      this.clearRepos();
       if (!this.recorded) {
         recordResult(s.levelIndex, s.earnings, s.outcome === 'won');
         this.recorded = true;

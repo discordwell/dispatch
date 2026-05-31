@@ -12,6 +12,7 @@ const cfg: LevelConfig = {
   name: 'npc-test',
   durationMs: 600_000,
   threshold: 1000,
+  shipSpeed: 48,
   cityIds: ['a', 'b'],
   ownedShips: [],
   npc: { enabled: true, spawnDistance: 100 },

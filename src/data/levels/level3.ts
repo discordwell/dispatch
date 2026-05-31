@@ -6,7 +6,8 @@ export const level3: LevelConfig = {
   rank: '♠♠♠',
   name: 'Brass Tempest',
   durationMs: 600_000,
-  threshold: 14000, // ~0.65× a careful multi-load run (~21.7k); demands a brisk pace
+  threshold: 13000, // ~0.61× a careful run (~21k); demands a brisk pace
+  shipSpeed: 24,
   cityIds: [
     'loading-bay',
     'the-slums',

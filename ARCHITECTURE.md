@@ -112,6 +112,12 @@ fee for booked ships. Partial loads are allowed; choosing the best-value subset 
   The board lists each as a "Hire ⟨size⟩ §cost" button. `bookNpc` spawns the chosen hull; `commitLoad`
   deducts the fixed cost from `earnings` once on dispatch (owned ships are free) and the lots pay gross —
   so a charter only profits on a full multi-load. There is no percentage fee.
+- **Reposition** (`actions.reposition`): an idle owned ship can be sent empty to a dock to pre-position it
+  (worthwhile because cruising is slow). It flies a one-stop `purpose:'reposition'` route with no hold and
+  idles on arrival (the `advanceStops` no-hold path — no payout, no events; owned, so the reaper skips it).
+  `GameUI` drives a one-shot "Send to dock" mode (banner + Esc); the next dock click repositions.
+- **Cruise speed is per level** (`LevelConfig.shipSpeed`, ramping down across the campaign); charters fly
+  `config.CHARTER_SPEED_MULT`× faster. `buildMilkRun`/`reposition` read it; all legs of a route share one speed.
 
 ## Campaign, feedback & audio (full game)
 

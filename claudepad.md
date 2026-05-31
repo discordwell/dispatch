@@ -7,6 +7,13 @@ Newest session summaries on top (keep 20; overflow → `oldpad.md`). Key Finding
 
 ## Session Summaries
 
+### 2026-05-31T00:17Z — Much slower per-level cruise + Send-to-dock reposition
+- User asks: cruise speed ~1/3–1/2 of before, slower for later levels; and let you send your own airships to a dock. 77 tests green, build clean, wet-tested live, redeployed.
+- **Speed is now per-level.** Removed global `config.SHIP_SPEED`/`NPC_SPEED`; added `LevelConfig.shipSpeed` (owned cruise: **L1 30 → L5 18**, ramping down — was a flat 48) + `config.CHARTER_SPEED_MULT` 1.15. `buildMilkRun`/`reposition` read `s.config.shipSpeed`; charters × the mult. (A cross-map hop is now ~16s.)
+- **Reposition ("Send to dock"):** new `actions.reposition(s, shipId, dockId)` — an idle OWNED ship flies empty (`status:'repositioning'`, `purpose:'reposition'` route, no hold) and idles at the dock via `advanceStops`' no-hold path (no earnings/events; owned so the charter-reaper skips it). The `'repositioning'`/`'reposition'` plumbing was already wired in sim/viewport/MapRenderer. UI: `ShipInspector` gains a "Send to dock…" button (and shows "Heading to / Next ETA" while repositioning) → `GameUI` one-shot mode (`.reposition-banner` + Esc); the next canvas dock-click sends it (keeps it selected), clicking off a dock cancels; `clearRepos()` on every exit path (dock click, off-dock, Esc, shift end, title, level load).
+- **Thresholds re-tuned** for the slower ships (careful ceilings dropped to ~6.6k/15k/21k/22k/23.5k): **4000/9000/13000/15000/17000** (~0.6–0.72× careful; margins gently tighten toward L5). `measure-balance.ts`/`levels.test` pick up the per-level speed automatically.
+- /code-review: no critical/important; fixed the stale `ShipStatus` comment + added a reaper-exclusion test.
+
 ### 2026-05-30T23:59Z — Slower ships, fixed-cost charters, brass labels
 - User asks: slow airships a bit; make hiring **contract ships** worthwhile only with a multi-load (choose the size but can't always get the one you want, fixed cost, one trip, larger = pricier); contracts persist much longer. Plus: redesign the janky dock labels. 74 vitest tests green, build clean, wet-tested live, redeployed.
 - **Speed:** `SHIP_SPEED 60→48`, `NPC_SPEED 72→56` (config).
