@@ -66,9 +66,9 @@ function playGatedCapped(idx: number, perItem: number, overhead: number, maxItem
   return s.earnings;
 }
 
-/** What a careful player manages, choosing a sensible load size (best over a few caps). */
+/** What a careful player manages, choosing a sensible load size (best over caps; mirrors measure-balance.ts). */
 function playCareful(idx: number): number {
-  return Math.max(...[4, 6, 8].map((m) => playGatedCapped(idx, 3400, 2400, m)));
+  return Math.max(...[3, 4, 5, 6, 8, 99].map((m) => playGatedCapped(idx, 3400, 2400, m)));
 }
 
 describe('levels', () => {

@@ -54,6 +54,7 @@ export interface ShipClass {
   name: string;
   holdW: number;
   holdH: number;
+  charterCost: number; // fixed fee to charter a hull of this class (owned ships are free)
 }
 
 // 'repositioning' is reserved (nothing sets it yet — deadheading is a real pickup stop now).
@@ -97,7 +98,7 @@ export interface Airship {
   id: string;
   shipClass: string; // references a ShipClass.name
   owned: boolean;
-  feeFraction: number; // 0 for owned ships; the booking cut for NPC ships
+  charterCost: number; // 0 for owned ships; the fixed fee paid (once, on dispatch) to charter it
   holdW: number;
   holdH: number;
   status: ShipStatus;
@@ -125,7 +126,7 @@ export interface DeliveryRequest {
   baseReward: number;
 }
 
-/** A bookable NPC ship, hovering near (not on) a city until hired. */
+/** A chartered ("contract") hull on offer near a dock until hired or the market rotates. */
 export interface NpcOffer {
   id: string;
   shipClass: string;
@@ -133,7 +134,7 @@ export interface NpcOffer {
   holdH: number;
   spawn: Vec2;
   nearCityId: CityId;
-  feeFraction: number;
+  cost: number; // fixed hire fee, by hull size (larger costs more)
 }
 
 export interface SpawnConfig {
@@ -151,8 +152,7 @@ export interface SpawnConfig {
 
 export interface NpcConfig {
   enabled: boolean;
-  feeFraction: number;
-  spawnDistance: number; // map units from the served city
+  spawnDistance: number; // map units a chartered hull hovers off its dock until hired
 }
 
 export interface LevelConfig {

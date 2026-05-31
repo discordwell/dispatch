@@ -3,6 +3,7 @@ import { step } from '../src/core/sim';
 import { createGameState } from '../src/core/setup';
 import { bookNpc, commitLoad } from '../src/state/actions';
 import { autoPack } from '../src/core/autopack';
+import { getShipClass } from '../src/data/ships';
 import type { DeliveryRequest, GameState, LevelConfig, NpcOffer, PolyominoItem } from '../src/core/types';
 
 const cfg: LevelConfig = {
@@ -13,7 +14,7 @@ const cfg: LevelConfig = {
   threshold: 1000,
   cityIds: ['a', 'b'],
   ownedShips: [],
-  npc: { enabled: true, feeFraction: 0.3, spawnDistance: 100 },
+  npc: { enabled: true, spawnDistance: 100 },
   spawn: {
     firstAtMs: 0,
     intervalMs: [1, 1],
@@ -46,7 +47,7 @@ function stateWithOffer(): GameState {
     holdH: 4,
     spawn: { x: 50, y: 50 },
     nearCityId: 'a',
-    feeFraction: 0.3,
+    cost: 350,
   };
   return {
     levelIndex: 1,
@@ -73,7 +74,8 @@ describe('npc charters', () => {
     const s = createGameState(1);
     expect(s.npcOffers.length).toBeGreaterThan(0);
     for (const o of s.npcOffers) {
-      expect(o.feeFraction).toBeCloseTo(s.config.npc.feeFraction);
+      expect(o.cost).toBe(getShipClass(o.shipClass).charterCost);
+      expect(o.cost).toBeGreaterThan(0);
       expect(s.cities.some((c) => c.id === o.nearCityId)).toBe(true);
     }
   });
@@ -90,18 +92,41 @@ describe('npc charters', () => {
     expect(s.requests[0]!.status).toBe('active'); // loading doesn't freeze the order
   });
 
-  it('a booked charter pays out minus its fee, then departs after delivering', () => {
+  it('a charter charges a fixed fee on dispatch, pays gross on delivery — a small load loses money', () => {
     const s = stateWithOffer();
     const id = bookNpc(s, 'o1', 'a')!;
     const ship = s.ships.find((sh) => sh.id === id)!;
+    expect(ship.charterCost).toBe(350); // Scout
     const placements = autoPack(ship.holdW, ship.holdH, s.requests[0]!.items);
     expect(commitLoad(s, id, placements)).toBe(true);
-    // loaded 200, fill 4/16 < floor → no bonus → gross 200, fee 30% → net 140
-    expect(ship.hold!.lots[0]!.payout).toBe(140);
-    step(s, 60_000); // fly spawn→pickup→dest
-    expect(s.earnings).toBe(140);
+    // sparse hold → no bonus → the lot pays gross 200; the §350 hire is charged on dispatch
+    expect(ship.hold!.lots[0]!.payout).toBe(200);
+    expect(s.earnings).toBe(-350); // fee deducted immediately, before any delivery
+    step(s, 60_000); // fly spawn → pickup → drop
+    expect(s.earnings).toBe(-150); // 200 gross − 350 hire: one small order isn't worth a charter
     expect(s.requests[0]!.status).toBe('delivered');
     expect(s.ships.find((sh) => sh.id === id)).toBeUndefined(); // charter departed
+  });
+
+  it('a charter turns a profit once you fill it with a multi-load', () => {
+    const s = stateWithOffer();
+    // a second order at the same dock lets us fill the hull
+    s.requests.push({
+      id: 'r2',
+      originId: 'a',
+      destId: 'b',
+      items: [domino('r2_0'), domino('r2_1')],
+      spawnAtMs: 0,
+      expiresAtMs: 999_999,
+      status: 'active',
+      baseReward: 200,
+    });
+    const id = bookNpc(s, 'o1', 'a')!;
+    const ship = s.ships.find((sh) => sh.id === id)!;
+    const items = [...s.requests[0]!.items, ...s.requests[1]!.items]; // 4 dominoes = 400 value
+    expect(commitLoad(s, id, autoPack(ship.holdW, ship.holdH, items))).toBe(true);
+    step(s, 60_000);
+    expect(s.earnings).toBe(50); // 400 gross − 350 hire
   });
 
   it('re-booking a regenerated offer id never destroys a live charter (C1 regression)', () => {
@@ -130,14 +155,14 @@ describe('npc charters', () => {
       holdH: 4,
       spawn: { x: 60, y: 60 },
       nearCityId: 'a',
-      feeFraction: 0.3,
+      cost: 350,
     });
 
     const id2 = bookNpc(s, 'o1', 'a');
     if (id2) expect(id2).not.toBe(id1); // distinct ship, no collision
-    // the original in-flight charter must survive and still pay out
+    // the original in-flight charter must survive the re-booking and complete its run
     expect(s.ships.some((sh) => sh.id === id1 && sh.status === 'flying')).toBe(true);
     step(s, 60_000);
-    expect(s.earnings).toBeGreaterThanOrEqual(140);
+    expect(s.requests.find((r) => r.id === 'r1')!.status).toBe('delivered');
   });
 });

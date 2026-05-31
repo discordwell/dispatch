@@ -53,6 +53,7 @@ export class Hud {
     const met = s.earnings >= s.config.threshold;
     this.earnEl.classList.toggle('met', met);
     this.fillEl.classList.toggle('met', met);
-    this.fillEl.style.width = `${Math.min(100, (s.earnings / s.config.threshold) * 100)}%`;
+    // clamp to [0,100]: a fixed charter fee can push earnings negative
+    this.fillEl.style.width = `${Math.max(0, Math.min(100, (s.earnings / s.config.threshold) * 100))}%`;
   }
 }

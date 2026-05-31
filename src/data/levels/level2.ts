@@ -19,7 +19,7 @@ export const level2: LevelConfig = {
     'sprocket-row',
   ],
   ownedShips: [{ shipClass: 'Hauler' }, { shipClass: 'Scout' }],
-  npc: { enabled: true, feeFraction: 0.28, spawnDistance: 160 },
+  npc: { enabled: true, spawnDistance: 160 },
   spawn: {
     firstAtMs: 4_000,
     intervalMs: [8_000, 14_000],

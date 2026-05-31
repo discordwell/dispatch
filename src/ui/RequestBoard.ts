@@ -1,14 +1,18 @@
 import { config } from '../config';
-import { idleShips, npcOfferNear } from '../state/actions';
-import type { City, DeliveryRequest, GameState } from '../core/types';
+import { idleShips, npcOffersAt } from '../state/actions';
+import type { City, DeliveryRequest, GameState, NpcOffer } from '../core/types';
 import { formatCountdown, formatMoney } from './format';
 import { shapeGlyphSVG } from './shapeGlyph';
 
-type Avail = { kind: 'owned' | 'charter' | 'none'; feePct: number };
+export interface BoardCallbacks {
+  onLoadDock: (cityId: string) => void;
+  onHire: (offerId: string) => void;
+}
 
 /**
- * The dock board: the orders waiting here now ("Available") + soon-to-arrive ("Incoming").
- * One dock-level action loads a ship with any subset of the available orders (the milk-run).
+ * The dock board: orders waiting here now ("Available") + soon-to-arrive ("Incoming"), and an
+ * action row — "Load Cargo" with an idle owned ship (free), plus a "Hire ⟨size⟩ §cost" button
+ * for each contract hull on offer here (fixed fee, one trip). You pick from the sizes available.
  */
 export class RequestBoard {
   readonly el: HTMLElement;
@@ -20,7 +24,7 @@ export class RequestBoard {
   private cityId = '';
   private nameOf: (id: string) => string = (id) => id;
 
-  constructor(parent: HTMLElement, onLoadDock: (cityId: string) => void) {
+  constructor(parent: HTMLElement, cb: BoardCallbacks) {
     const el = document.createElement('div');
     el.className = 'panel';
     el.innerHTML = `
@@ -37,8 +41,14 @@ export class RequestBoard {
     this.foot = el.querySelector('.panel-foot')!;
 
     this.foot.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-load-dock]');
-      if (btn && !(btn as HTMLButtonElement).disabled) onLoadDock(this.cityId);
+      const t = e.target as HTMLElement;
+      const hire = t.closest<HTMLElement>('[data-hire]');
+      if (hire) {
+        cb.onHire(hire.dataset.hire!);
+        return;
+      }
+      const load = t.closest<HTMLElement>('[data-load]');
+      if (load && !(load as HTMLButtonElement).disabled) cb.onLoadDock(this.cityId);
     });
   }
 
@@ -62,29 +72,33 @@ export class RequestBoard {
       .filter((r) => r.status === 'scheduled' && r.originId === cityId && r.spawnAtMs > s.clockMs)
       .sort((a, b) => a.spawnAtMs - b.spawnAtMs)
       .slice(0, config.UPCOMING_PEEK);
-    const charter = npcOfferNear(s, cityId);
-    const avail: Avail = idleShips(s).some((sh) => sh.owned)
-      ? { kind: 'owned', feePct: 0 }
-      : charter
-        ? { kind: 'charter', feePct: Math.round(charter.feeFraction * 100) }
-        : { kind: 'none', feePct: 0 };
+    const hasOwnedIdle = idleShips(s).some((sh) => sh.owned);
+    const offers = npcOffersAt(s, cityId)
+      .slice()
+      .sort((a, b) => a.cost - b.cost);
 
     const sig = [
       cityId,
       active.map((r) => r.id).join(','),
       upcoming.map((r) => r.id).join(','),
-      avail.kind,
-      avail.feePct,
+      hasOwnedIdle ? 'own' : '-',
+      offers.map((o) => o.id).join(','),
     ].join('|');
     if (sig !== this.lastSig || this.cityName !== city.name) {
-      this.rebuild(city, active, upcoming, avail);
+      this.rebuild(city, active, upcoming, hasOwnedIdle, offers);
       this.lastSig = sig;
       this.cityName = city.name;
     }
     this.updateTimers(s);
   }
 
-  private rebuild(city: City, active: DeliveryRequest[], upcoming: DeliveryRequest[], avail: Avail): void {
+  private rebuild(
+    city: City,
+    active: DeliveryRequest[],
+    upcoming: DeliveryRequest[],
+    hasOwnedIdle: boolean,
+    offers: NpcOffer[],
+  ): void {
     this.headTitle.textContent = city.name;
     const parts: string[] = [];
     if (active.length === 0 && upcoming.length === 0) {
@@ -100,19 +114,19 @@ export class RequestBoard {
     }
     this.body.innerHTML = parts.join('');
 
-    // one dock-level action: load a ship with any subset of the available orders
-    let action = '';
+    // action row — only meaningful when there are orders to load here
+    const buttons: string[] = [];
     if (active.length) {
-      if (avail.kind === 'owned') {
-        action = `<button class="btn" data-load-dock="${city.id}">Load Cargo</button>`;
-      } else if (avail.kind === 'charter') {
-        action = `<button class="btn" data-load-dock="${city.id}" title="Hire a charter (fee on payout)">Hire Charter −${avail.feePct}%</button>`;
-      } else {
-        action = `<button class="btn" disabled title="No airship available">No airship</button>`;
+      if (hasOwnedIdle) buttons.push(`<button class="btn" data-load>Load Cargo</button>`);
+      for (const o of offers) {
+        buttons.push(
+          `<button class="btn charter" data-hire="${o.id}" title="Contract hull — one trip, fixed fee">Hire ${o.shipClass} ${o.holdW}×${o.holdH} · ${formatMoney(o.cost)}</button>`,
+        );
       }
+      if (buttons.length === 0) buttons.push(`<button class="btn" disabled title="No airship available">No airship</button>`);
     }
-    this.foot.innerHTML = action;
-    this.foot.style.display = action ? '' : 'none';
+    this.foot.innerHTML = buttons.join('');
+    this.foot.style.display = buttons.length ? '' : 'none';
   }
 
   private card(r: DeliveryRequest, isActive: boolean): string {

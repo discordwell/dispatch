@@ -6,7 +6,7 @@ export const level5: LevelConfig = {
   rank: '♠♠♠♠♠',
   name: 'Five Aces',
   durationMs: 600_000,
-  threshold: 23000, // ~0.82× a careful multi-load run (~28k) — the dispatcher-bound finale; brisk play required
+  threshold: 20000, // ~0.78× a careful multi-load run (~25.6k) — the dispatcher-bound finale; brisk play required
   cityIds: [
     'loading-bay',
     'the-slums',
@@ -28,7 +28,7 @@ export const level5: LevelConfig = {
     { shipClass: 'Hauler' },
     { shipClass: 'Leviathan' },
   ],
-  npc: { enabled: true, feeFraction: 0.22, spawnDistance: 210 },
+  npc: { enabled: true, spawnDistance: 210 },
   spawn: {
     firstAtMs: 2_500,
     intervalMs: [4_000, 7_000],

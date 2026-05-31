@@ -6,7 +6,7 @@ export const level4: LevelConfig = {
   rank: '♠♠♠♠',
   name: 'The Gauntlet',
   durationMs: 600_000,
-  threshold: 19000, // ~0.69× a careful multi-load run (~27.5k)
+  threshold: 17000, // ~0.63× a careful multi-load run (~27k)
   cityIds: [
     'loading-bay',
     'the-slums',
@@ -26,7 +26,7 @@ export const level4: LevelConfig = {
     { shipClass: 'Leviathan' },
     { shipClass: 'Hauler' },
   ],
-  npc: { enabled: true, feeFraction: 0.24, spawnDistance: 190 },
+  npc: { enabled: true, spawnDistance: 190 },
   spawn: {
     firstAtMs: 3_000,
     intervalMs: [5_000, 9_000],

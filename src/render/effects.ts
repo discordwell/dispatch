@@ -37,6 +37,18 @@ export class Effects {
     this.floats.push({ x: p.x, y: p.y - 16, text: 'expired', color: COL.dangerHi, born: now, ttl: 1100 });
   }
 
+  /** A charter's fixed hire fee, floated where the contract hull launches. */
+  cost(p: Vec2, amount: number, now: number): void {
+    this.floats.push({
+      x: p.x,
+      y: p.y - 16,
+      text: `−§${Math.round(amount).toLocaleString('en-US')}`,
+      color: COL.dangerHi,
+      born: now,
+      ttl: 1500,
+    });
+  }
+
   clear(): void {
     this.floats.length = 0;
     this.rings.length = 0;

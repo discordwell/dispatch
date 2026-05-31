@@ -111,6 +111,9 @@ export class MapRenderer {
   effectExpire(p: Vec2): void {
     this.effects.expire(p, performance.now());
   }
+  effectCost(p: Vec2, amount: number): void {
+    this.effects.cost(p, amount, performance.now());
+  }
 
   render(s: GameState): void {
     const ctx = this.ctx;

@@ -43,8 +43,8 @@ export function upcomingRequestsAt(s: GameState, cityId: string, n: number): Del
 export function idleShips(s: GameState): Airship[] {
   return s.ships.filter((sh) => sh.status === 'idle');
 }
-export function npcOfferNear(s: GameState, cityId: string): NpcOffer | undefined {
-  return s.npcOffers.find((o) => o.nearCityId === cityId);
+export function npcOffersAt(s: GameState, cityId: string): NpcOffer[] {
+  return s.npcOffers.filter((o) => o.nearCityId === cityId);
 }
 
 // ── intents ─────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ export function commitLoad(s: GameState, shipId: string, placements: Placement[]
   // whole-hold payout — the efficiency bonus is computed once over the combined load
   const loaded = loadedValue(valid, allItems);
   const fill = fillRatio(ship.holdW, ship.holdH, occupied);
-  const pay = computePayout({ loaded, fill, owned: ship.owned, feeFraction: ship.feeFraction });
+  const pay = computePayout({ loaded, fill });
 
   // group placements by request, summing each request's loaded value
   const groups = new Map<string, { req: DeliveryRequest; items: PolyominoItem[]; value: number }>();
@@ -121,9 +121,9 @@ export function commitLoad(s: GameState, shipId: string, placements: Placement[]
     groups.set(req.id, g);
   }
 
-  // split the net payout proportionally to each request's loaded value (shares sum to net)
+  // split the gross payout proportionally to each request's loaded value (shares sum to gross)
   const groupList = [...groups.values()];
-  const shares = splitNet(pay.net, groupList.map((g) => g.value));
+  const shares = splitNet(pay.gross, groupList.map((g) => g.value));
   const lots: CargoLot[] = groupList.map((g, i) => {
     g.req.status = 'assigned'; // immune to expiry now that it's committed to a ship
     return { requestId: g.req.id, destId: g.req.destId, items: g.items, payout: shares[i]! };
@@ -137,12 +137,14 @@ export function commitLoad(s: GameState, shipId: string, placements: Placement[]
   ship.status = 'flying';
   ship.locationId = null;
   delete ship.loadingDockId;
+  s.earnings -= ship.charterCost; // fixed hire fee, paid once on dispatch (0 for owned ships)
   return true;
 }
 
 /**
- * Split `net` across lots in proportion to `values`, handing the rounding remainder to the
- * largest fractional parts so the shares sum to exactly `net`. Deterministic (ties by index).
+ * Split a total (here, a hold's gross payout) across parts in proportion to `values`, handing the
+ * rounding remainder to the largest fractional parts so the shares sum to exactly the total.
+ * Deterministic (ties broken by index).
  */
 export function splitNet(net: number, values: number[]): number[] {
   if (values.length === 0) return [];
@@ -220,7 +222,7 @@ export function bookNpc(s: GameState, offerId: string, dockId: string): string |
     id: `npc-${offer.id}-${s.seq++}`,
     shipClass: offer.shipClass,
     owned: false,
-    feeFraction: offer.feeFraction,
+    charterCost: offer.cost,
     holdW: offer.holdW,
     holdH: offer.holdH,
     status: 'idle',

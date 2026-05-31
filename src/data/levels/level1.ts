@@ -10,7 +10,7 @@ export const level1: LevelConfig = {
   rank: '♠',
   name: 'The Morning Mail',
   durationMs: 600_000,
-  threshold: 5500, // ~0.57× a careful multi-load run (~9.7k); gentle ace-1 goal. See measure-balance harness.
+  threshold: 5000, // ~0.55× a careful multi-load run (~9k) at the slower cruise; gentle ace-1 goal. See measure-balance.ts.
   cityIds: [
     'loading-bay',
     'the-slums',
@@ -22,7 +22,7 @@ export const level1: LevelConfig = {
     'aether-pier',
   ],
   ownedShips: [{ shipClass: 'Hauler' }],
-  npc: { enabled: true, feeFraction: 0.3, spawnDistance: 150 },
+  npc: { enabled: true, spawnDistance: 150 },
   spawn: {
     firstAtMs: 4_000,
     intervalMs: [9_000, 16_000],

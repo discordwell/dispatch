@@ -161,21 +161,45 @@ export function paintCity(ctx: CanvasRenderingContext2D, c: { name: string; x: n
   ctx.lineTo(c.x + R * 0.24, c.y + R * 0.1);
   ctx.stroke();
 
-  // label plate (dark + brass-edged, for legibility over the colorful city map)
-  ctx.font = `600 ${o.hub ? 18 : 14}px Georgia, 'Times New Roman', serif`;
+  // label — a small engraved brass nameplate: warm and in-world, legible over the busy map
+  ctx.font = `600 ${o.hub ? 16 : 13}px Georgia, 'Times New Roman', serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const tw = ctx.measureText(c.name).width;
-  const ly = c.y + R + 14;
-  ctx.fillStyle = 'rgba(20,13,6,0.82)';
-  roundRect(ctx, c.x - tw / 2 - 8, ly - 11, tw + 16, 22, 6);
+  const plH = o.hub ? 22 : 19;
+  const plW = tw + 20;
+  const plX = c.x - plW / 2;
+  const plY = c.y + R + 7;
+  const plCY = plY + plH / 2;
+
+  // plate with a soft drop shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 5;
+  ctx.shadowOffsetY = 2;
+  const pg = ctx.createLinearGradient(0, plY, 0, plY + plH);
+  pg.addColorStop(0, COL.brass3);
+  pg.addColorStop(0.5, COL.brass2);
+  pg.addColorStop(1, COL.brass1);
+  ctx.fillStyle = pg;
+  roundRect(ctx, plX, plY, plW, plH, 5);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(232,200,122,0.5)';
+  ctx.restore();
+
+  // engraved bezel: dark keyline + inner highlight
+  ctx.strokeStyle = 'rgba(26,16,8,0.78)';
   ctx.lineWidth = 1;
-  roundRect(ctx, c.x - tw / 2 - 8, ly - 11, tw + 16, 22, 6);
+  roundRect(ctx, plX + 0.5, plY + 0.5, plW - 1, plH - 1, 5);
   ctx.stroke();
-  ctx.fillStyle = COL.parch2;
-  ctx.fillText(c.name, c.x, ly);
+  ctx.strokeStyle = 'rgba(255,246,214,0.5)';
+  roundRect(ctx, plX + 1.5, plY + 1.5, plW - 3, plH - 3, 4);
+  ctx.stroke();
+
+  // engraved text: a light relief under dark ink
+  ctx.fillStyle = 'rgba(255,247,218,0.5)';
+  ctx.fillText(c.name, c.x, plCY + 1);
+  ctx.fillStyle = COL.sepia1;
+  ctx.fillText(c.name, c.x, plCY);
 
   // active-request badge (pulses red when a request is about to expire)
   if (o.activeCount > 0) {

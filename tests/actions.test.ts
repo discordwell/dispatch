@@ -18,7 +18,7 @@ const cfg: LevelConfig = {
   threshold: 1000,
   cityIds: [],
   ownedShips: [],
-  npc: { enabled: false, feeFraction: 0, spawnDistance: 0 },
+  npc: { enabled: false, spawnDistance: 0 },
   spawn: {
     firstAtMs: 0,
     intervalMs: [1, 1],
@@ -54,7 +54,7 @@ function haulerAt(locId: string, x: number, y: number): Airship {
     id: 's1',
     shipClass: 'Hauler',
     owned: true,
-    feeFraction: 0,
+    charterCost: 0,
     holdW: 5,
     holdH: 6,
     status: 'idle',
@@ -226,7 +226,7 @@ describe('bookNpc', () => {
       holdH: 4,
       spawn: { x: 60, y: 60 },
       nearCityId: 'd',
-      feeFraction: 0.3,
+      cost: 350,
     };
     const s = baseState({ npcOffers: [offer] });
     const id = bookNpc(s, 'o1', 'd');

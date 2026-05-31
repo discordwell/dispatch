@@ -3,7 +3,7 @@ import type { MapRenderer } from '../render/MapRenderer';
 import { createGameState } from '../core/setup';
 import { screenToWorld } from '../render/viewport';
 import { pickAt, type Pick } from '../render/hitTest';
-import { beginLoad, bookNpc, cancelLoad, commitLoad, idleShips, npcOfferNear } from '../state/actions';
+import { beginLoad, bookNpc, cancelLoad, commitLoad, idleShips } from '../state/actions';
 import { loadProgress, recordResult } from '../state/progress';
 import { initAudio, isMuted, resumeAudio, sfx, toggleMute } from '../audio';
 import type { GameState, Placement } from '../core/types';
@@ -39,7 +39,10 @@ export class GameUI {
     private renderer: MapRenderer,
   ) {
     this.hud = new Hud(root);
-    this.board = new RequestBoard(root, (cityId) => this.openLoading(cityId));
+    this.board = new RequestBoard(root, {
+      onLoadDock: (cityId) => this.openLoading(cityId),
+      onHire: (offerId) => this.hireCharter(offerId),
+    });
     this.inspector = new ShipInspector(root);
     this.overlay = new PackingOverlay(root, {
       onCommit: (shipId, placements) => this.commit(shipId, placements),
@@ -127,8 +130,8 @@ export class GameUI {
   }
 
   /**
-   * Open the dock's loading puzzle with a ship: the selected idle ship, else an idle owned
-   * ship already at the dock, else any idle owned ship (it deadheads in), else a charter.
+   * Open the dock's loading puzzle with an idle owned ship: the selected one, else one already
+   * at the dock, else any idle owned ship (it deadheads in). Charters go through hireCharter.
    */
   private openLoading(cityId: string): void {
     const s = this.store.getState();
@@ -137,28 +140,30 @@ export class GameUI {
     const selId = sel && sel.type === 'ship' ? sel.id : null;
     const chosen =
       idle.find((sh) => sh.id === selId) ?? idle.find((sh) => sh.locationId === cityId) ?? idle[0];
-    if (chosen) {
-      let ok = false;
-      this.store.update((st) => {
-        ok = beginLoad(st, cityId, chosen.id);
-      });
-      if (ok) {
-        this.loading = { dockId: cityId, shipId: chosen.id };
-        this.overlay.open(this.store.getState(), cityId, chosen.id);
-      }
-      this.sync();
-      return;
+    if (!chosen) return;
+    let ok = false;
+    this.store.update((st) => {
+      ok = beginLoad(st, cityId, chosen.id);
+    });
+    if (ok) {
+      this.loading = { dockId: cityId, shipId: chosen.id };
+      this.overlay.open(this.store.getState(), cityId, chosen.id);
     }
-    const offer = npcOfferNear(s, cityId);
-    if (offer) {
-      let shipId: string | null = null;
-      this.store.update((st) => {
-        shipId = bookNpc(st, offer.id, cityId);
-      });
-      if (shipId) {
-        this.loading = { dockId: cityId, shipId };
-        this.overlay.open(this.store.getState(), cityId, shipId);
-      }
+    this.sync();
+  }
+
+  /** Book a specific contract hull (the chosen size, at its dock) and open its loading puzzle. */
+  private hireCharter(offerId: string): void {
+    const offer = this.store.getState().npcOffers.find((o) => o.id === offerId);
+    if (!offer) return;
+    const dockId = offer.nearCityId;
+    let shipId: string | null = null;
+    this.store.update((st) => {
+      shipId = bookNpc(st, offerId, dockId);
+    });
+    if (shipId) {
+      this.loading = { dockId, shipId };
+      this.overlay.open(this.store.getState(), dockId, shipId);
     }
     this.sync();
   }
@@ -184,10 +189,18 @@ export class GameUI {
     this.store.update((st) => {
       ok = commitLoad(st, shipId, placements);
     });
-    // A failed commit (e.g. every picked order expired mid-pack) must not strand the ship
-    // in 'loading' with the overlay closed — return it to idle.
-    if (ok) sfx.dispatch();
-    else this.store.update((st) => cancelLoad(st, shipId));
+    if (ok) {
+      sfx.dispatch();
+      // surface the fixed hire fee where a chartered hull launches
+      const ship = this.store.getState().ships.find((sh) => sh.id === shipId);
+      if (ship && !ship.owned && ship.charterCost > 0 && ship.route) {
+        this.renderer.effectCost(ship.route.from, ship.charterCost);
+      }
+    } else {
+      // A failed commit (e.g. every picked order expired mid-pack) must not strand the ship
+      // in 'loading' with the overlay closed — return it to idle.
+      this.store.update((st) => cancelLoad(st, shipId));
+    }
     this.loading = null;
     this.overlay.close();
     this.sync();

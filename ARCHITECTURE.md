@@ -106,6 +106,12 @@ fee for booked ships. Partial loads are allowed; choosing the best-value subset 
   arrival times at one cruise speed, so a single `routeProgress` over the full `routePolyline` positions
   the ship. `sim.advanceStops` credits each stop reached this tick exactly once (auto-unloading the lots
   due there, one `deliver` event per stop) and idles the ship at the final drop — where it can load again.
+- **Chartered ("contract") ships** are a paid capacity boost. `refreshNpcOffers` posts a long-lived
+  market (`NPC_OFFER_REFRESH_MS`): a few demand docks each offer a random subset of hull sizes
+  (`shuffled`, seeded) at a **fixed hire cost by size** (`ShipClass.charterCost`; bigger = pricier).
+  The board lists each as a "Hire ⟨size⟩ §cost" button. `bookNpc` spawns the chosen hull; `commitLoad`
+  deducts the fixed cost from `earnings` once on dispatch (owned ships are free) and the lots pay gross —
+  so a charter only profits on a full multi-load. There is no percentage fee.
 
 ## Campaign, feedback & audio (full game)
 

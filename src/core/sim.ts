@@ -1,17 +1,30 @@
 import { config } from '../config';
 import { SHIP_CLASSES } from '../data/ships';
 import { polylinePosition, routePolyline, routeProgress } from './geometry';
-import { makeRng, pick } from './rng';
+import { makeRng, pick, randInt, type Rng } from './rng';
 import type { Airship, GameState, NpcOffer } from './types';
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
+/** Seeded Fisher–Yates copy (deterministic). */
+function shuffled<T>(rng: Rng, arr: readonly T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randInt(rng, 0, i);
+    const tmp = a[i]!;
+    a[i] = a[j]!;
+    a[j] = tmp;
+  }
+  return a;
+}
+
 /**
- * Regenerate the bookable-charter roster. Offers cluster near cities that currently
- * have demand (active requests), hovering a fixed distance off the city. Deterministic
- * per time-bucket so a given seed + clock yields the same roster.
+ * Regenerate the charter market. A few docks with demand each host a random, distinct subset
+ * of hull sizes (so you choose, but can't always get the size you want), hovering off the dock,
+ * each at its fixed hire cost. Deterministic per time-bucket; the bucket is long
+ * (NPC_OFFER_REFRESH_MS), so a contract lingers until hired or the market rotates.
  */
 export function refreshNpcOffers(s: GameState): void {
   if (!s.config.npc.enabled) {
@@ -25,27 +38,32 @@ export function refreshNpcOffers(s: GameState): void {
   );
   const pool = withDemand.length ? withDemand : s.cities;
   const classes = Object.values(SHIP_CLASSES);
+  const d = s.config.npc.spawnDistance;
   const offers: NpcOffer[] = [];
-  const used = new Set<string>();
-  const count = Math.min(config.NPC_MAX_OFFERS, pool.length);
-  for (let i = 0; i < count; i++) {
+  const usedDocks = new Set<string>();
+  const dockCount = Math.min(config.NPC_MARKET_DOCKS, pool.length);
+  for (let i = 0; i < dockCount; i++) {
     let city = pick(rng, pool);
-    for (let g = 0; g < 8 && used.has(city.id); g++) city = pick(rng, pool);
-    used.add(city.id);
-    const cls = pick(rng, classes);
-    const ang = rng() * Math.PI * 2;
-    const d = s.config.npc.spawnDistance;
-    offers.push({
-      id: `npc${bucket}_${i}`,
-      shipClass: cls.name,
-      holdW: cls.holdW,
-      holdH: cls.holdH,
-      spawn: {
-        x: clamp(city.x + Math.cos(ang) * d, 40, config.MAP_W - 40),
-        y: clamp(city.y + Math.sin(ang) * d, 40, config.MAP_H - 40),
-      },
-      nearCityId: city.id,
-      feeFraction: s.config.npc.feeFraction,
+    for (let g = 0; g < 8 && usedDocks.has(city.id); g++) city = pick(rng, pool);
+    if (usedDocks.has(city.id)) continue;
+    usedDocks.add(city.id);
+    const nSizes = clamp(1 + randInt(rng, 0, config.NPC_MAX_SIZES_PER_DOCK - 1), 1, classes.length);
+    const sizes = shuffled(rng, classes).slice(0, nSizes);
+    sizes.forEach((cls, j) => {
+      const ang = rng() * Math.PI * 2;
+      const dist = d + j * 26;
+      offers.push({
+        id: `npc${bucket}_${i}_${cls.name}`,
+        shipClass: cls.name,
+        holdW: cls.holdW,
+        holdH: cls.holdH,
+        spawn: {
+          x: clamp(city.x + Math.cos(ang) * dist, 40, config.MAP_W - 40),
+          y: clamp(city.y + Math.sin(ang) * dist, 40, config.MAP_H - 40),
+        },
+        nearCityId: city.id,
+        cost: cls.charterCost,
+      });
     });
   }
   s.npcOffers = offers;

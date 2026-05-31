@@ -34,28 +34,15 @@ describe('payout', () => {
     expect(efficiencyBonus(200, 0.7)).toBeLessThan(efficiencyBonus(200, 0.9));
   });
 
-  it('computePayout: owned ships keep the full gross', () => {
-    const r = computePayout({ loaded: 200, fill: 1, owned: true });
+  it('computePayout: gross is loaded value plus the efficiency bonus', () => {
+    const r = computePayout({ loaded: 200, fill: 1 });
     expect(r.bonus).toBe(100);
     expect(r.gross).toBe(300);
-    expect(r.net).toBe(300);
-  });
-
-  it('computePayout: booked NPC ships pay a fee off the gross', () => {
-    const r = computePayout({ loaded: 200, fill: 1, owned: false, feeFraction: 0.3 });
-    expect(r.gross).toBe(300);
-    expect(r.net).toBe(Math.round(300 * 0.7)); // 210
   });
 
   it('computePayout: a sparse hold earns no bonus', () => {
-    const r = computePayout({ loaded: 150, fill: config.FILL_FLOOR, owned: true });
+    const r = computePayout({ loaded: 150, fill: config.FILL_FLOOR });
     expect(r.bonus).toBe(0);
-    expect(r.net).toBe(150);
-  });
-
-  it('computePayout: clamps an out-of-range fee so payout can never go negative', () => {
-    const r = computePayout({ loaded: 200, fill: 0.2, owned: false, feeFraction: 1.5 });
-    expect(r.net).toBeGreaterThanOrEqual(0);
-    expect(r.net).toBe(Math.round(200 * (1 - 0.95))); // fee clamped to 0.95
+    expect(r.gross).toBe(150);
   });
 });

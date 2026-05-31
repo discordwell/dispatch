@@ -6,7 +6,7 @@ export const level3: LevelConfig = {
   rank: '♠♠♠',
   name: 'Brass Tempest',
   durationMs: 600_000,
-  threshold: 15000, // ~0.66× a careful multi-load run (~23k); now demands a brisk pace
+  threshold: 14000, // ~0.65× a careful multi-load run (~21.7k); demands a brisk pace
   cityIds: [
     'loading-bay',
     'the-slums',
@@ -20,7 +20,7 @@ export const level3: LevelConfig = {
     'gearford-wall',
   ],
   ownedShips: [{ shipClass: 'Hauler' }, { shipClass: 'Scout' }, { shipClass: 'Leviathan' }],
-  npc: { enabled: true, feeFraction: 0.26, spawnDistance: 175 },
+  npc: { enabled: true, spawnDistance: 175 },
   spawn: {
     firstAtMs: 3_500,
     intervalMs: [6_500, 11_000],

@@ -10,8 +10,8 @@ export const config = {
   // --- Map / motion (map units == Zybourne City map pixels: 765x600) ---
   MAP_W: 765,
   MAP_H: 600,
-  SHIP_SPEED: 60, // owned-ship cruise speed, map units per second (tuned for the smaller city map)
-  NPC_SPEED: 72, // booked NPC ships fly a little faster
+  SHIP_SPEED: 48, // owned-ship cruise speed, map units per second (a measured pace over the city)
+  NPC_SPEED: 56, // chartered ships fly a little faster
 
   // --- Payout ---
   BONUS_MAX: 0.5, // efficiency bonus caps at +50% of loaded value on a perfectly full hold
@@ -20,9 +20,10 @@ export const config = {
   // --- Request board presentation ---
   UPCOMING_PEEK: 3, // how many not-yet-active requests a city board previews
 
-  // --- NPC booking ---
-  NPC_OFFER_REFRESH_MS: 18_000, // how often the bookable-NPC roster is refreshed
-  NPC_MAX_OFFERS: 3,
+  // --- Chartered ("contract") ships ---
+  NPC_OFFER_REFRESH_MS: 75_000, // contract offers linger this long before the market rotates
+  NPC_MARKET_DOCKS: 3, // how many docks host a charter market at once
+  NPC_MAX_SIZES_PER_DOCK: 2, // distinct hull sizes offered at a dock (you choose from what's there)
 } as const;
 
 export type Config = typeof config;

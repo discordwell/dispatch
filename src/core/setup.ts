@@ -19,7 +19,7 @@ export function createGameState(levelIndex: number): GameState {
       id: `ship${i + 1}`,
       shipClass: cls.name,
       owned: true,
-      feeFraction: 0,
+      charterCost: 0,
       holdW: cls.holdW,
       holdH: cls.holdH,
       status: 'idle',

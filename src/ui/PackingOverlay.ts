@@ -49,7 +49,7 @@ export class PackingOverlay {
   private dockId = '';
   private shipId = '';
   private owned = true;
-  private fee = 0;
+  private charterCost = 0;
   private w = 0;
   private h = 0;
   private items: PolyominoItem[] = [];
@@ -124,7 +124,7 @@ export class PackingOverlay {
     this.dockId = dockId;
     this.shipId = shipId;
     this.owned = ship.owned;
-    this.fee = ship.feeFraction;
+    this.charterCost = ship.charterCost;
     this.w = ship.holdW;
     this.h = ship.holdH;
     this.placed = new Map();
@@ -195,10 +195,10 @@ export class PackingOverlay {
       return;
     }
     this.shipSelectEl.innerHTML = eligible
-      .map(
-        (sh) =>
-          `<button class="ship-chip ${sh.id === activeId ? 'active' : ''}" data-ship="${sh.id}">${sh.shipClass} <span>${sh.holdW}×${sh.holdH}</span></button>`,
-      )
+      .map((sh) => {
+        const tag = sh.owned ? `${sh.holdW}×${sh.holdH}` : `${sh.holdW}×${sh.holdH} · §${sh.charterCost}`;
+        return `<button class="ship-chip ${sh.id === activeId ? 'active' : ''}" data-ship="${sh.id}">${sh.shipClass} <span>${tag}</span></button>`;
+      })
       .join('');
   }
 
@@ -272,13 +272,20 @@ export class PackingOverlay {
     const { occupied } = buildOccupancy(this.w, this.h, placements, this.itemMap);
     const loaded = loadedValue(placements, this.itemMap);
     const fill = fillRatio(this.w, this.h, occupied);
-    const pay = computePayout({ loaded, fill, owned: this.owned, feeFraction: this.fee });
+    const pay = computePayout({ loaded, fill });
     const drops = new Set([...this.placed.keys()].map((id) => this.destByItem.get(id))).size;
-    this.readoutEl.innerHTML =
+    let html =
       `<span>Value <b>${formatMoney(loaded)}</b></span>` +
       `<span>Fill <b>${Math.round(fill * 100)}%</b></span>` +
       `<span>Drops <b>${drops}</b></span>` +
-      `<span>Payout <b>${formatMoney(pay.net)}</b></span>`;
+      `<span>Payout <b>${formatMoney(pay.gross)}</b></span>`;
+    if (!this.owned && this.charterCost > 0) {
+      const net = pay.gross - this.charterCost;
+      html +=
+        `<span class="hire">Hire <b>−${formatMoney(this.charterCost)}</b></span>` +
+        `<span class="net ${net < 0 ? 'bad' : ''}">Net <b>${formatMoney(net)}</b></span>`;
+    }
+    this.readoutEl.innerHTML = html;
     this.commitBtn.disabled = placements.length === 0;
   }
 

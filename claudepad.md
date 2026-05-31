@@ -7,6 +7,16 @@ Newest session summaries on top (keep 20; overflow → `oldpad.md`). Key Finding
 
 ## Session Summaries
 
+### 2026-05-30T23:59Z — Slower ships, fixed-cost charters, brass labels
+- User asks: slow airships a bit; make hiring **contract ships** worthwhile only with a multi-load (choose the size but can't always get the one you want, fixed cost, one trip, larger = pricier); contracts persist much longer. Plus: redesign the janky dock labels. 74 vitest tests green, build clean, wet-tested live, redeployed.
+- **Speed:** `SHIP_SPEED 60→48`, `NPC_SPEED 72→56` (config).
+- **Charters → fixed cost by hull (no more % fee).** Removed `feeFraction` everywhere (NpcOffer/Airship/NpcConfig, computePayout, the 5 level npc blocks). Added `ShipClass.charterCost` (Scout 350 / Hauler 650 / Leviathan 1000), `Airship.charterCost`, `NpcOffer.cost`. `computePayout` returns gross only; `commitLoad` deducts `ship.charterCost` from earnings ONCE on dispatch (owned = 0; charged only on success, so a failed/abandoned/reaped charter costs nothing). Net = delivered gross − fixed cost → a small load is a loss, a full multi-load profits. Earnings can go negative (intended); HUD bar clamped to [0,100].
+- **Sized market that lingers:** `NPC_OFFER_REFRESH_MS 18k→75k`, `NPC_MARKET_DOCKS 3`, `NPC_MAX_SIZES_PER_DOCK 2`. `refreshNpcOffers` offers a random distinct subset of hull sizes per demand dock (seeded `shuffled` Fisher–Yates; deterministic). `npcOffersAt(dockId)` replaced `npcOfferNear`.
+- **UI:** RequestBoard action row = "Load Cargo" (brass, owned) + a teal "Hire ⟨size⟩ §cost" per offer (`{onLoadDock,onHire}`); `GameUI.hireCharter(offerId)`; overlay readout shows **Hire −§cost / Net** (red when negative); ship-switch chips tag charters with cost; `effects.cost()` floats the fee on dispatch; ShipInspector shows the fixed cost.
+- **Dock labels redesigned:** engraved **brass nameplate** (warm, in-world) replacing the stark dark-plate/white-text — `paint.ts` paintCity.
+- **Balance retune** for slower ships (careful ceilings dropped): thresholds **5000/11000/14000/17000/20000** (~0.5–0.78× careful; L5 dispatcher-bound = tightest). `levels.test` multi-load policy cap set widened `[3,4,5,6,8,99]` to match `measure-balance.ts`.
+- /code-review: no Critical/Important; applied the two recommended one-liners (nSizes clamp, HUD width floor) + a comment fix.
+
 ### 2026-05-30T22:51Z — City-map background + multi-load milk-run
 - User asks: use the downloaded **Zybourne City** map as the background with **docks** instead of cities, and **pick up multiple loads per trip**. Plan: `~/.claude/plans/synthetic-swinging-thompson.md`. 75 vitest tests green, build clean, hard wet-tested live, redeployed.
 - **Map + docks:** `src/assets/zybourne-city.png` (765×600, GIF→PNG) drawn by `paintCityMap` inside the brass frame; `MapRenderer.knockOutWhiteBackground` flood-fills the GIF's white surround → transparent so the sepia ground shows. config `MAP_W/H=765/600`, `SHIP_SPEED 78→60`. `cities.ts` is now 12 **docks** across the map districts (hub = `loading-bay`); `level1..5` cityIds updated. Internal type stays `City`/`cityId` (deliberate — a "city" now models a dock).

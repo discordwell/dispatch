@@ -29,19 +29,15 @@ export interface PayoutResult {
   loaded: number;
   fill: number;
   bonus: number;
-  gross: number;
-  net: number;
+  gross: number; // loaded value + efficiency bonus; paid out in full on delivery
 }
 
-export function computePayout(opts: {
-  loaded: number;
-  fill: number;
-  owned: boolean;
-  feeFraction?: number;
-}): PayoutResult {
+/**
+ * The delivery payout: loaded value + efficiency bonus. There is no percentage fee — a
+ * chartered hull instead costs a fixed fee (charged once on dispatch, see actions.commitLoad).
+ */
+export function computePayout(opts: { loaded: number; fill: number }): PayoutResult {
   const bonus = efficiencyBonus(opts.loaded, opts.fill);
   const gross = opts.loaded + bonus;
-  const fee = opts.owned ? 0 : Math.min(0.95, Math.max(0, opts.feeFraction ?? 0));
-  const net = Math.round(gross * (1 - fee));
-  return { loaded: opts.loaded, fill: opts.fill, bonus, gross, net };
+  return { loaded: opts.loaded, fill: opts.fill, bonus, gross };
 }

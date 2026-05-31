@@ -65,7 +65,7 @@ export class ShipInspector {
     } else {
       rows.push(['Location', nameOf(ship.loadingDockId ?? ship.locationId)]);
     }
-    if (!ship.owned) rows.push(['Booking fee', `${Math.round(ship.feeFraction * 100)}%`]);
+    if (!ship.owned) rows.push(['Charter (one trip)', formatMoney(ship.charterCost)]);
 
     this.body.innerHTML = rows
       .map(([k, v]) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`)
