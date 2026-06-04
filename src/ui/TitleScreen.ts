@@ -16,7 +16,7 @@ export class TitleScreen {
         <div class="start-sub">Zybourne Clock Airways</div>
         <div class="result-flavor">It is the future. Route the airships, pack the holds, beat the clock.</div>
         <div class="level-grid"></div>
-        <div class="title-hint">Earn past the threshold before the 10-minute shift ends.</div>
+        <div class="title-hint">Earn past the threshold before the shift bell.</div>
       </div>`;
     parent.appendChild(el);
     this.el = el;

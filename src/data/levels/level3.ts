@@ -5,8 +5,8 @@ export const level3: LevelConfig = {
   index: 3,
   rank: '♠♠♠',
   name: 'Brass Tempest',
-  durationMs: 600_000,
-  threshold: 13000, // ~0.61× a careful run (~21k); demands a brisk pace
+  durationMs: 240_000, // 4-minute shift
+  threshold: 4500, // ~0.58× a careful 4-min run (~7.7k); demands a brisk pace
   shipSpeed: 24,
   cityIds: [
     'loading-bay',
@@ -25,8 +25,8 @@ export const level3: LevelConfig = {
   spawn: {
     firstAtMs: 3_500,
     intervalMs: [6_500, 11_000],
-    maxConcurrent: 6,
-    expiryMs: [32_000, 55_000],
+    maxConcurrent: 8,
+    expiryMs: [75_000, 130_000],
     itemsPerRequest: [3, 5],
     shapeTiers: [2, 3],
     valuePerCell: [26, 40],

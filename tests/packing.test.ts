@@ -5,6 +5,7 @@ import {
   fillRatio,
   filledCells,
   placementCells,
+  pieceAt,
   idx,
 } from '../src/core/packing';
 import type { PolyominoItem, Placement } from '../src/core/types';
@@ -81,5 +82,24 @@ describe('packing', () => {
     expect(fillRatio(2, 2, full.occupied)).toBe(1);
     const half = buildOccupancy(4, 2, [place('o', 0, 0)], items);
     expect(fillRatio(4, 2, half.occupied)).toBe(0.5);
+  });
+
+  it('pieceAt finds the piece covering a cell, else null', () => {
+    // I4 spans (0,0)..(3,0); O4 is the 2×2 block anchored at (0,1) → (0..1, 1..2).
+    const placed = [place('i', 0, 0), place('o', 0, 1)];
+    expect(pieceAt(placed, items, { x: 2, y: 0 })).toBe('i');
+    expect(pieceAt(placed, items, { x: 1, y: 2 })).toBe('o');
+    expect(pieceAt(placed, items, { x: 4, y: 4 })).toBeNull(); // empty cell
+  });
+
+  it('pieceAt respects orientation', () => {
+    // I4 rotated 90° at (0,0) becomes a vertical column x=0, y=0..3.
+    const placed = [place('i', 0, 0, 1)];
+    expect(pieceAt(placed, items, { x: 0, y: 3 })).toBe('i'); // covered only once rotated
+    expect(pieceAt(placed, items, { x: 1, y: 0 })).toBeNull(); // covered only in base orientation
+  });
+
+  it('pieceAt ignores placements whose item is unknown', () => {
+    expect(pieceAt([place('ghost', 0, 0)], items, { x: 0, y: 0 })).toBeNull();
   });
 });

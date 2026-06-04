@@ -5,8 +5,8 @@ export const level2: LevelConfig = {
   index: 2,
   rank: '♠♠',
   name: 'Two Winds',
-  durationMs: 600_000,
-  threshold: 9000, // ~0.6× a careful run (~15k)
+  durationMs: 180_000, // 3-minute shift
+  threshold: 1900, // ~0.58× a careful 3-min run (~3.3k)
   shipSpeed: 27,
   cityIds: [
     'loading-bay',
@@ -24,8 +24,8 @@ export const level2: LevelConfig = {
   spawn: {
     firstAtMs: 4_000,
     intervalMs: [8_000, 14_000],
-    maxConcurrent: 5,
-    expiryMs: [40_000, 65_000],
+    maxConcurrent: 7,
+    expiryMs: [75_000, 125_000],
     itemsPerRequest: [2, 5],
     shapeTiers: [1, 2, 3],
     valuePerCell: [24, 36],

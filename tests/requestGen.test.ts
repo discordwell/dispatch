@@ -19,7 +19,7 @@ describe('requestGen', () => {
 
   it('produces a non-trivial schedule within the shift', () => {
     const reqs = generateRequests(level1, cities1);
-    expect(reqs.length).toBeGreaterThan(10);
+    expect(reqs.length).toBeGreaterThan(5); // ~8 over the 2-min ace-1 shift; just guards against a degenerate schedule
     for (const r of reqs) {
       expect(r.spawnAtMs).toBeGreaterThanOrEqual(level1.spawn.firstAtMs);
       expect(r.spawnAtMs).toBeLessThan(level1.durationMs);

@@ -5,8 +5,8 @@ export const level5: LevelConfig = {
   index: 5,
   rank: '♠♠♠♠♠',
   name: 'Five Aces',
-  durationMs: 600_000,
-  threshold: 17000, // ~0.72× a careful run (~23.5k) — the dispatcher-bound finale; brisk play required
+  durationMs: 360_000, // 6-minute shift
+  threshold: 10500, // ~0.60× a careful 6-min run (~17.6k) — the dispatcher-bound finale; brisk play required
   shipSpeed: 18,
   cityIds: [
     'loading-bay',
@@ -33,8 +33,8 @@ export const level5: LevelConfig = {
   spawn: {
     firstAtMs: 2_500,
     intervalMs: [4_000, 7_000],
-    maxConcurrent: 8,
-    expiryMs: [20_000, 38_000],
+    maxConcurrent: 10,
+    expiryMs: [65_000, 110_000],
     itemsPerRequest: [4, 6],
     shapeTiers: [3, 4],
     valuePerCell: [30, 46],

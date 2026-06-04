@@ -17,7 +17,7 @@ Clock's cyber-world. From a glowing dispatch console you watch a map of 8–12 c
 airships threading between them. Citizens post **delivery requests**; you route airships to
 pick them up, **hand-pack their oddly-shaped cargo** into the hold for maximum payout, and
 race the clock. Five levels, ranked **one ace to five aces** (after Johnny Five Aces himself).
-Each level is a **10-minute shift**; clear the earnings threshold to advance.
+Each level is a tight **2-to-6-minute shift** (one minute longer per ace); clear the earnings threshold to advance.
 
 The game lives in the tension between two demands on your attention:
 
@@ -61,7 +61,7 @@ polished and readable. The "bad-internet-art" charm lives in the writing, not th
 3. **Pack** the request's items into that airship's cargo hold (the core puzzle).
 4. **Dispatch** — the airship flies origin → destination in real time.
 5. **Deliver** — on arrival, payout lands; the ship is free for the next job.
-6. **Repeat** under a live 10-minute clock. End over the earnings threshold → advance.
+6. **Repeat** under a live shift clock (2–6 minutes). End over the earnings threshold → advance.
 
 The skill ceiling is **parallelism under time pressure**: keeping 1→5 airships busy, choosing
 high-value requests, and packing fast without leaving ships idle or letting requests expire.
@@ -105,10 +105,10 @@ high-value requests, and packing fast without leaving ships idle or letting requ
 ### 4.5 Money & Scoring
 - Each delivered item pays its value; booking fees and (maybe) fuel are costs.
 - Bonuses: packing efficiency, request complexity, possibly speed/combo streaks.
-- Level goal: **total earnings ≥ threshold** before the 10-minute timer ends.
+- Level goal: **total earnings ≥ threshold** before the shift timer ends.
 
 ### 4.6 Timer & Level Structure
-- Each level = **10 minutes** real-time.
+- Each level = a **2-to-6-minute** shift (2 min at one ace, +1 min per ace to 6 min at five aces).
 - **One ace → five aces**, rising difficulty: more cities, more/faster requests, more owned
   airships to juggle, harder shapes, higher thresholds.
 

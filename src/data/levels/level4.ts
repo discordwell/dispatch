@@ -5,8 +5,8 @@ export const level4: LevelConfig = {
   index: 4,
   rank: '♠♠♠♠',
   name: 'The Gauntlet',
-  durationMs: 600_000,
-  threshold: 15000, // ~0.67× a careful run (~22k)
+  durationMs: 300_000, // 5-minute shift
+  threshold: 7500, // ~0.59× a careful 5-min run (~12.6k)
   shipSpeed: 21,
   cityIds: [
     'loading-bay',
@@ -31,8 +31,8 @@ export const level4: LevelConfig = {
   spawn: {
     firstAtMs: 3_000,
     intervalMs: [5_000, 9_000],
-    maxConcurrent: 7,
-    expiryMs: [26_000, 46_000],
+    maxConcurrent: 9,
+    expiryMs: [70_000, 120_000],
     itemsPerRequest: [3, 6],
     shapeTiers: [2, 3, 4],
     valuePerCell: [28, 42],

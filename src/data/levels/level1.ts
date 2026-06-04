@@ -9,8 +9,8 @@ export const level1: LevelConfig = {
   index: 1,
   rank: '♠',
   name: 'The Morning Mail',
-  durationMs: 600_000,
-  threshold: 4000, // ~0.6× a careful run (~6.6k) at the slow cruise; gentle ace-1 goal. See measure-balance.ts.
+  durationMs: 120_000, // 2-minute shift
+  threshold: 700, // ~0.57× a careful 2-min run (~1.2k); gentle ace-1 goal. See measure-balance.ts.
   shipSpeed: 30,
   cityIds: [
     'loading-bay',
@@ -27,8 +27,8 @@ export const level1: LevelConfig = {
   spawn: {
     firstAtMs: 4_000,
     intervalMs: [9_000, 16_000],
-    maxConcurrent: 4,
-    expiryMs: [45_000, 75_000],
+    maxConcurrent: 6, // raised with the longer expiry so the board stays stocked to batch from
+    expiryMs: [70_000, 110_000], // long enough to hold several orders and batch them, yet can still lapse before the bell
     itemsPerRequest: [2, 4],
     shapeTiers: [1, 2],
     valuePerCell: [22, 34],

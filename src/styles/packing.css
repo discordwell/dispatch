@@ -150,6 +150,38 @@
   border: 1.5px solid rgba(20, 15, 8, 0.55);
   box-shadow: inset 0 1px 0 rgba(255, 248, 224, 0.4);
 }
+/* Per-piece remove badge: re-enables clicks inside the pointer-events:none pieces layer. */
+.piece-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  color: #fff6e0;
+  background: rgba(20, 14, 8, 0.62);
+  border: 1px solid rgba(255, 248, 224, 0.55);
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.5;
+  transition: opacity 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+.piece-remove:hover {
+  opacity: 1;
+  background: var(--danger);
+  transform: scale(1.15);
+}
+/* Hide the badges while a piece is in hand so a place-click never lands on one. */
+.pack-grid.holding .piece-remove {
+  display: none;
+}
 .ghost {
   position: fixed;
   left: 0;

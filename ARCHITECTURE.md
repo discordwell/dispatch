@@ -61,7 +61,8 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 unit-testable); rendering interpolates. A single frame's `dt` is clamped to
 `config.MAX_FRAME_DT_MS` so a backgrounded tab doesn't mass-expire requests on return.
 
-The level clock is **simulation time** counted inside `sim.step` (`durationMs = 600_000`). Because
+The level clock is **simulation time** counted inside `sim.step` (per-level `durationMs`, a tight
+2–6 min shift rising one minute per ace). Because
 it's sim-time and the packing overlay is merely a DOM layer, **time keeps running while you pack** —
 ships keep flying and requests keep expiring. That tension is the core of the game and falls out
 of the architecture for free (the loop has no concept of "a modal is open").
@@ -85,6 +86,10 @@ re-normalize (translate to origin + sort) so equality/dedup is well-defined. Hol
 `Uint8Array(w*h)` **derived on demand** from `placements` (never stored stale). `canPlace` checks
 bounds + overlap. Payout = loaded value + `BONUS_MAX·smoothstep(fill, FILL_FLOOR, 1)`, then the NPC
 fee for booked ships. Partial loads are allowed; choosing the best-value subset is the puzzle.
+In the overlay a piece can be **placed**, **lifted** (click a placed piece to pick it up and
+reposition), or **removed** back to the manifest three ways — its ✕ badge, right-click, or the
+**Clear** button (empty the whole hold). Lift and remove share one pure, unit-tested hit-test,
+`core/packing.pieceAt(placements, items, cell)`, which resolves the placed piece under a cell.
 
 ## Map & multi-load milk-run
 
@@ -104,6 +109,10 @@ fee for booked ships. Partial loads are allowed; choosing the best-value subset 
   into `CargoLot`s, computes the whole-hold payout once and `splitNet`s it across lots by value, then
   dispatches. Orders are NOT frozen while loading (time never pauses); commit re-validates and drops any
   order that expired or was taken by another ship mid-pack, dispatching the valid remainder.
+  Order **lifetimes** (`spawn.expiryMs`) are tuned long (min ≥ 60s, scaling up on the lower levels) and
+  per-level `maxConcurrent` rises with them (6→10 across the campaign), so several orders stay live across
+  docks at once — the raw material a multi-stop load batches. A `levels.test` guard pins the minimum
+  lifetime so a future tweak can't quietly shrink windows back to where batching dies.
 - **Multi-stop route.** `buildMilkRun` orders the lots' distinct destinations nearest-neighbour from the
   dock (deterministic tie-break), prepending a non-crediting **pickup stop** when the ship isn't already
   there (so any idle ship can load any dock, and charters fly in). `Route.stops[]` carries per-stop

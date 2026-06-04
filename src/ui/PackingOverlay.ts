@@ -1,5 +1,5 @@
 import { boundingBox, orientedCells } from '../core/polyomino';
-import { buildOccupancy, canPlace, fillRatio, idx } from '../core/packing';
+import { buildOccupancy, canPlace, fillRatio, idx, pieceAt } from '../core/packing';
 import { computePayout, loadedValue } from '../core/payout';
 import type { GameState, Placement, PolyominoItem, Rotation } from '../core/types';
 import { sfx } from '../audio';
@@ -85,10 +85,11 @@ export class PackingOverlay {
           <div class="pack-tray"><h3 class="tray-title">Manifest</h3><div class="tray-list"></div></div>
         </div>
         <div class="pack-foot">
-          <div class="pack-hint">Click a piece · <kbd>R</kbd> rotate · <kbd>F</kbd> flip · <kbd>Esc</kbd> release</div>
+          <div class="pack-hint">Click a piece · <kbd>R</kbd> rotate · <kbd>F</kbd> flip · ✕ / right-click removes · <kbd>Esc</kbd> release</div>
           <div class="pack-actions">
             <button class="btn secondary" data-act="rotate">Rotate</button>
             <button class="btn secondary" data-act="flip">Flip</button>
+            <button class="btn secondary" data-act="clear">Clear</button>
             <button class="btn secondary" data-act="cancel">Cancel</button>
             <button class="btn" data-act="commit">Load &amp; Dispatch</button>
           </div>
@@ -236,6 +237,12 @@ export class PackingOverlay {
       const el = pieceEl(item, p.rot, p.flipped, CELL, this.colorOf(itemId));
       el.style.left = `${p.origin.x * CELL}px`;
       el.style.top = `${p.origin.y * CELL}px`;
+      const remove = document.createElement('button');
+      remove.className = 'piece-remove';
+      remove.dataset.remove = itemId;
+      remove.title = 'Remove from hold';
+      remove.textContent = '✕';
+      el.appendChild(remove);
       this.piecesLayer.appendChild(el);
     }
   }
@@ -290,6 +297,8 @@ export class PackingOverlay {
   }
 
   private renderGhost(): void {
+    // While carrying a piece, hide the placed-piece ✕ badges so a place-click never lands on one.
+    this.gridEl.classList.toggle('holding', !!this.held);
     if (!this.held) {
       this.ghostEl.classList.remove('show');
       return;
@@ -376,7 +385,25 @@ export class PackingOverlay {
     this.gridEl.addEventListener('click', () => this.onGridClick());
     this.gridEl.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      if (this.held) this.rotateHeld();
+      this.pointer = { x: e.clientX, y: e.clientY };
+      if (this.held) {
+        this.rotateHeld();
+        return;
+      }
+      // Right-click a placed piece → send it back to the manifest.
+      const cell = this.cellUnderPointer();
+      const owner = cell && this.ownerAt(cell);
+      if (owner) this.removePlaced(owner);
+    });
+
+    // The ✕ badge on a placed piece removes it. It lives inside the pointer-events:none
+    // pieces layer but re-enables clicks on itself; stop the event so the grid doesn't also
+    // treat it as a lift-click on the same piece.
+    this.piecesLayer.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-remove]');
+      if (!btn) return;
+      e.stopPropagation();
+      this.removePlaced(btn.dataset.remove!);
     });
 
     this.frame.addEventListener('click', (e) => {
@@ -390,6 +417,7 @@ export class PackingOverlay {
       const act = btn.dataset.act;
       if (act === 'rotate') this.rotateHeld();
       else if (act === 'flip') this.flipHeld();
+      else if (act === 'clear') this.clearPlaced();
       else if (act === 'cancel') this.cb.onCancel(this.shipId);
       else if (act === 'commit') this.commit();
     });
@@ -434,14 +462,7 @@ export class PackingOverlay {
   }
 
   private ownerAt(cell: { x: number; y: number }): string | null {
-    for (const [itemId, p] of this.placed) {
-      const item = this.itemMap.get(itemId);
-      if (!item) continue;
-      for (const c of orientedCells(item.cells, p.rot, p.flipped)) {
-        if (p.origin.x + c.x === cell.x && p.origin.y + c.y === cell.y) return itemId;
-      }
-    }
-    return null;
+    return pieceAt(this.placed.values(), this.itemMap, cell);
   }
 
   private rotateHeld(): void {
@@ -460,6 +481,22 @@ export class PackingOverlay {
   }
   private releaseHeld(): void {
     this.held = null;
+    this.renderAll();
+  }
+
+  /** Send a single placed piece back to the manifest (✕ badge or right-click). */
+  private removePlaced(itemId: string): void {
+    if (!this.placed.delete(itemId)) return;
+    sfx.pickup();
+    this.renderAll();
+  }
+
+  /** Empty the hold: every placed piece (and anything in hand) returns to the manifest. */
+  private clearPlaced(): void {
+    if (this.placed.size === 0 && !this.held) return;
+    this.placed.clear();
+    this.held = null;
+    sfx.pickup();
     this.renderAll();
   }
 

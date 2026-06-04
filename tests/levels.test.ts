@@ -94,6 +94,18 @@ describe('levels', () => {
     });
   });
 
+  it('orders persist long enough to assemble multi-stop loads', () => {
+    // The milk-run batching strategy needs an order to outlive the time to free a ship,
+    // fly to its dock, pack, and route. Guard the minimum lifetime so a future tweak can't
+    // silently shrink windows back to where carrying multiple orders at once dies.
+    for (const lvl of LEVELS) {
+      expect(
+        lvl.spawn.expiryMs[0],
+        `level ${lvl.index} min order lifetime`,
+      ).toBeGreaterThanOrEqual(60_000);
+    }
+  });
+
   it('every level is winnable at a careful, multi-load pace (with margin to spare)', () => {
     for (const lvl of LEVELS) {
       const banked = playCareful(lvl.index);

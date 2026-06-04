@@ -71,6 +71,27 @@ export function buildOccupancy(
   return { occupied, ok };
 }
 
+/**
+ * Which placed piece (if any) covers `cell` — the hit-test behind lifting and removing a
+ * placed piece in the packing overlay. Returns the owning itemId, or null if the cell is
+ * empty. The first placement in iteration order that covers the cell wins (placements on a
+ * valid hold never overlap, so order is immaterial there).
+ */
+export function pieceAt(
+  placements: Iterable<Placement>,
+  items: ReadonlyMap<string, PolyominoItem>,
+  cell: Cell,
+): string | null {
+  for (const p of placements) {
+    const item = items.get(p.itemId);
+    if (!item) continue;
+    for (const c of placementCells(item, p)) {
+      if (c.x === cell.x && c.y === cell.y) return p.itemId;
+    }
+  }
+  return null;
+}
+
 export function filledCells(occupied: Uint8Array): number {
   let n = 0;
   for (let i = 0; i < occupied.length; i++) if (occupied[i] === 1) n++;
