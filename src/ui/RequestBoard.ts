@@ -1,5 +1,5 @@
 import { config } from '../config';
-import { idleShips, npcOffersAt } from '../state/actions';
+import { activeRequestsAt, idleShips, npcOffersAt, upcomingRequestsAt } from '../state/actions';
 import type { City, DeliveryRequest, GameState, NpcOffer } from '../core/types';
 import { formatCountdown, formatMoney } from './format';
 import { shapeGlyphSVG } from './shapeGlyph';
@@ -67,11 +67,8 @@ export class RequestBoard {
     this.cityId = cityId;
     this.nameOf = (id) => s.cities.find((c) => c.id === id)?.name ?? id;
 
-    const active = s.requests.filter((r) => r.status === 'active' && r.originId === cityId);
-    const upcoming = s.requests
-      .filter((r) => r.status === 'scheduled' && r.originId === cityId && r.spawnAtMs > s.clockMs)
-      .sort((a, b) => a.spawnAtMs - b.spawnAtMs)
-      .slice(0, config.UPCOMING_PEEK);
+    const active = activeRequestsAt(s, cityId);
+    const upcoming = upcomingRequestsAt(s, cityId, config.UPCOMING_PEEK);
     const hasOwnedIdle = idleShips(s).some((sh) => sh.owned);
     const offers = npcOffersAt(s, cityId)
       .slice()

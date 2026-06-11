@@ -2,7 +2,10 @@
 export const CUR = '§';
 
 export function formatMoney(n: number): string {
-  return CUR + Math.round(n).toLocaleString('en-US');
+  // Earnings can go negative (a charter's fixed fee is paid up front) — sign before the
+  // currency mark ("−§350"), not "§-350".
+  const r = Math.round(n);
+  return (r < 0 ? '−' : '') + CUR + Math.abs(r).toLocaleString('en-US');
 }
 
 /** ms → "M:SS" (clamped at 0). */

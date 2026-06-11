@@ -92,6 +92,25 @@ export function pieceAt(
   return null;
 }
 
+/**
+ * Map a point to the hold cell under it, or null when it falls outside the w×h grid.
+ * `origin` must be the grid's CONTENT corner — for a DOM grid that's the border-box corner
+ * plus the border widths (clientLeft/Top); measuring from the border box instead skews
+ * every hit by the border width.
+ */
+export function cellAtPoint(
+  point: { x: number; y: number },
+  origin: { x: number; y: number },
+  cellPx: number,
+  w: number,
+  h: number,
+): Cell | null {
+  const x = Math.floor((point.x - origin.x) / cellPx);
+  const y = Math.floor((point.y - origin.y) / cellPx);
+  if (x < 0 || y < 0 || x >= w || y >= h) return null;
+  return { x, y };
+}
+
 export function filledCells(occupied: Uint8Array): number {
   let n = 0;
   for (let i = 0; i < occupied.length; i++) if (occupied[i] === 1) n++;

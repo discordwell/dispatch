@@ -1,6 +1,7 @@
 import { boundingBox, orientedCells } from '../core/polyomino';
-import { buildOccupancy, canPlace, fillRatio, idx, pieceAt } from '../core/packing';
+import { buildOccupancy, canPlace, cellAtPoint, fillRatio, idx, pieceAt } from '../core/packing';
 import { computePayout, loadedValue } from '../core/payout';
+import { activeRequestsAt } from '../state/actions';
 import type { GameState, Placement, PolyominoItem, Rotation } from '../core/types';
 import { sfx } from '../audio';
 import { formatClock, formatMoney } from './format';
@@ -58,6 +59,7 @@ export class PackingOverlay {
   private destColor = new Map<string, string>();
   private nameOf: (id: string) => string = (id) => id;
   private liveSig = '';
+  private shipSig = '';
   private placed = new Map<string, Placement>();
   private held: Held | null = null;
   private pointer = { x: 0, y: 0 };
@@ -130,6 +132,7 @@ export class PackingOverlay {
     this.h = ship.holdH;
     this.placed = new Map();
     this.held = null;
+    this.destColor = new Map(); // fresh palette per session; setItemsFrom keeps it sticky after that
     this.setItemsFrom(s);
 
     this.shipNameEl.textContent = ship.shipClass;
@@ -152,14 +155,16 @@ export class PackingOverlay {
   /** Derive the tray from every active order at the dock, colored by destination. */
   private setItemsFrom(s: GameState): void {
     this.nameOf = (id) => s.cities.find((c) => c.id === id)?.name ?? id;
-    const reqs = s.requests.filter((r) => r.originId === this.dockId && r.status === 'active');
+    const reqs = activeRequestsAt(s, this.dockId);
     this.items = reqs.flatMap((r) => r.items);
     this.itemMap = new Map(this.items.map((i) => [i.id, i]));
     this.destByItem = new Map(reqs.flatMap((r) => r.items.map((i) => [i.id, r.destId] as const)));
-    this.destColor = new Map();
-    let di = 0;
+    // Colors are sticky for the whole session (only unseen destinations get a new one), so a
+    // mid-pack tray refresh never recolors pieces the player has already placed.
     for (const r of reqs) {
-      if (!this.destColor.has(r.destId)) this.destColor.set(r.destId, DEST_COLORS[di++ % DEST_COLORS.length]!);
+      if (!this.destColor.has(r.destId)) {
+        this.destColor.set(r.destId, DEST_COLORS[this.destColor.size % DEST_COLORS.length]!);
+      }
     }
     this.liveSig = this.items.map((i) => i.id).join(',');
   }
@@ -176,8 +181,7 @@ export class PackingOverlay {
     this.expiringEl.textContent = expiring > 0 ? `${expiring} order${expiring > 1 ? 's' : ''} expiring!` : '';
 
     // The board never freezes: an order can expire (or a new one arrive) while we pack.
-    const sig = s.requests
-      .filter((r) => r.originId === this.dockId && r.status === 'active')
+    const sig = activeRequestsAt(s, this.dockId)
       .flatMap((r) => r.items.map((i) => i.id))
       .join(',');
     if (sig !== this.liveSig) {
@@ -186,11 +190,21 @@ export class PackingOverlay {
       if (this.held && !this.itemMap.has(this.held.itemId)) this.held = null;
       this.renderAll();
     }
+
+    // Ships keep flying while we pack: one that lands and idles here becomes switchable.
+    this.renderShipSelect(s, this.shipId);
   }
 
-  /** Chips to switch which idle owned ship loads at this dock (hidden if only one option). */
+  /**
+   * Chips to switch which idle owned ship loads at this dock (hidden if only one option).
+   * Re-rendered live from syncClock — a ship that lands mid-pack becomes switchable — but
+   * only when the eligible set actually changes (signature-gated, like the tray).
+   */
   private renderShipSelect(s: GameState, activeId: string): void {
     const eligible = s.ships.filter((sh) => (sh.owned && sh.status === 'idle') || sh.id === activeId);
+    const sig = `${activeId}|${eligible.map((sh) => sh.id).join(',')}`;
+    if (sig === this.shipSig) return;
+    this.shipSig = sig;
     if (eligible.length <= 1) {
       this.shipSelectEl.innerHTML = '';
       return;
@@ -289,7 +303,7 @@ export class PackingOverlay {
     if (!this.owned && this.charterCost > 0) {
       const net = pay.gross - this.charterCost;
       html +=
-        `<span class="hire">Hire <b>−${formatMoney(this.charterCost)}</b></span>` +
+        `<span class="hire">Hire <b>${formatMoney(-this.charterCost)}</b></span>` +
         `<span class="net ${net < 0 ? 'bad' : ''}">Net <b>${formatMoney(net)}</b></span>`;
     }
     this.readoutEl.innerHTML = html;
@@ -319,11 +333,11 @@ export class PackingOverlay {
 
   // ── geometry helpers ─────────────────────────────────────────────────────────
   private cellUnderPointer(): { x: number; y: number } | null {
+    // getBoundingClientRect() is the border box; the cells start inside the grid's border
+    // (clientLeft/Top), so hand cellAtPoint the content-edge origin.
     const r = this.gridEl.getBoundingClientRect();
-    const x = Math.floor((this.pointer.x - r.left) / CELL);
-    const y = Math.floor((this.pointer.y - r.top) / CELL);
-    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return null;
-    return { x, y };
+    const origin = { x: r.left + this.gridEl.clientLeft, y: r.top + this.gridEl.clientTop };
+    return cellAtPoint(this.pointer, origin, CELL, this.w, this.h);
   }
 
   private occupancyExcludingHeld(): Uint8Array {

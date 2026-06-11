@@ -32,27 +32,37 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 | `src/core/rng.ts` | mulberry32 seeded PRNG | ✓ |
 | `src/core/geometry.ts` | distance, travelTimeMs, multi-stop polyline position | ✓ |
 | `src/core/polyomino.ts` | rotate90 / flip / normalize / orientedCells / bbox | ✓ |
-| `src/core/packing.ts` | derived occupancy grid, canPlace, fillRatio | ✓ |
-| `src/core/payout.ts` | loaded value + efficiency bonus + NPC fee | ✓ |
+| `src/core/packing.ts` | derived occupancy grid, canPlace, fillRatio, pieceAt | ✓ |
+| `src/core/payout.ts` | loaded value + efficiency (fill) bonus | ✓ |
 | `src/core/requestGen.ts` | seeded request schedule from LevelConfig | ✓ |
-| `src/core/sim.ts` | `step(state, dtMs)`: movement, ETAs, spawn/expiry, money, win/lose | ✓ |
-| `src/state/store.ts` | holds GameState; subscribe/getState/tick | – |
-| `src/state/actions.ts` | intents: beginLoad / commitLoad / cancelLoad, splitNet, buildMilkRun, bookNpc | – |
+| `src/core/sim.ts` | `step(state, dtMs)`: movement, stop resolution, spawn/expiry, money, win/lose; charter market | ✓ |
+| `src/core/setup.ts` | `createGameState(levelIndex)` — fresh deterministic state | ✓ |
+| `src/core/autopack.ts` | greedy first-fit packer for tests + balance runs (not a player feature) | ✓ |
+| `src/state/store.ts` | holds GameState; subscribe/getState/advance/flush/update/reset | – |
+| `src/state/actions.ts` | intents: beginLoad / commitLoad / cancelLoad / reposition / bookNpc, splitNet, buildMilkRun + read selectors | – |
+| `src/state/progress.ts` | campaign progress (unlocks, best earnings) in localStorage; pure `applyResult` | – |
 | `src/engine/loop.ts` | rAF fixed-timestep accumulator | – |
 | `src/render/MapRenderer.ts` | Canvas: city-map raster (+white knockout), multi-stop routes, docks, airships | – |
 | `src/render/paint.ts` | procedural brass/parchment/glow draw helpers | – |
-| `src/render/hitTest.ts` | screen→world; which city/ship is under the cursor | – |
+| `src/render/viewport.ts` | world↔screen transform; where a ship is drawn (fan-out at docks) | – |
+| `src/render/hitTest.ts` | which city/ship is under a world-space point (topmost ship wins) | – |
+| `src/render/effects.ts` | transient feedback: payout float-ups, delivery rings, fee floats | – |
+| `src/ui/GameUI.ts` | top-level controller: selection, campaign flow, canvas clicks, per-frame sync | – |
 | `src/ui/Hud.ts` | money, shift clock, threshold progress | – |
-| `src/ui/RequestBoard.ts` | dock board: orders here + incoming; one dock-level Load action | – |
-| `src/ui/ShipInspector.ts` | ship status / multi-stop route / cargo / next-stop ETA | – |
-| `src/ui/PackingOverlay.ts` | the cargo puzzle: grid + draggable polyominoes | – |
-| `src/ui/dragController.ts` | pointer drag/rotate/flip state machine | – |
-| `src/ui/BookingDialog.ts` | book an NPC ship for a request | – |
+| `src/ui/RequestBoard.ts` | dock board: orders here + incoming; Load Cargo + Hire-charter actions | – |
+| `src/ui/ShipInspector.ts` | ship status / multi-stop route / cargo / next-stop ETA / send-to-dock | – |
+| `src/ui/PackingOverlay.ts` | the cargo puzzle: grid, click-to-carry pieces, rotate/flip, live tray | – |
+| `src/ui/TitleScreen.ts` | level-select grid (locked/unlocked, best scores) | – |
+| `src/ui/ResultOverlay.ts` | win/lose (and campaign-complete) end-of-shift screen | – |
 | `src/ui/flavor.ts` | verbatim Zybourne quotes / loading lines | – |
+| `src/ui/format.ts` | money/clock/countdown formatting | ✓ |
+| `src/ui/shapeGlyph.ts` | tiny SVG glyph of a polyomino for the boards | ✓ |
+| `src/audio.ts` | procedural WebAudio SFX (no assets), mute persisted | – |
+| `src/main.ts` | bootstrap: store + loop + renderer + GameUI; `__dispatch` debug handle | – |
 | `src/data/cities.ts` | dock catalog (a `City` models a dock; superset for all levels) | ✓ |
 | `src/data/shapes.ts` | polyomino library, tiered by difficulty | ✓ |
-| `src/data/ships.ts` | ship classes (Scout 4×4, Hauler 5×6, Leviathan 6×8) | ✓ |
-| `src/data/levels/*` | `LevelConfig`s; level1 concrete, 2–5 stubs | ✓ |
+| `src/data/ships.ts` | ship classes (Scout 4×4, Hauler 5×6, Leviathan 6×8) + charter costs | ✓ |
+| `src/data/levels/*` | the five tuned `LevelConfig`s (difficulty is data, never code) | ✓ |
 
 ## Time model
 

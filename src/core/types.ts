@@ -41,15 +41,6 @@ export interface Placement {
   origin: Cell;
 }
 
-/** A working or committed pack of a request into a specific ship's hold. */
-export interface PackingState {
-  shipId: string;
-  requestId: string;
-  w: number;
-  h: number;
-  placements: Placement[];
-}
-
 export interface ShipClass {
   name: string;
   holdW: number;

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   canPlace,
   buildOccupancy,
+  cellAtPoint,
   fillRatio,
   filledCells,
   placementCells,
@@ -101,5 +102,33 @@ describe('packing', () => {
 
   it('pieceAt ignores placements whose item is unknown', () => {
     expect(pieceAt([place('ghost', 0, 0)], items, { x: 0, y: 0 })).toBeNull();
+  });
+});
+
+describe('cellAtPoint', () => {
+  // A 4×4 grid of 40px cells whose content starts at (103, 53) — i.e. a 3px border
+  // around a box at (100, 50), the packing overlay's exact shape.
+  const origin = { x: 103, y: 53 };
+  const at = (x: number, y: number) => cellAtPoint({ x, y }, origin, 40, 4, 4);
+
+  it('maps points to the cell that contains them', () => {
+    expect(at(103, 53)).toEqual({ x: 0, y: 0 });
+    expect(at(142.9, 92.9)).toEqual({ x: 0, y: 0 }); // last fraction of the first cell
+    expect(at(143, 93)).toEqual({ x: 1, y: 1 }); // first pixel of the next
+    expect(at(262.9, 212.9)).toEqual({ x: 3, y: 3 }); // far corner cell (263/213 is the exclusive edge)
+  });
+
+  it('would mis-bucket border-edge points if measured from the border box (the bug this pins)', () => {
+    // Same physical point, but an origin that wrongly includes the 3px border: a click in
+    // the last 3px of cell 0 lands in cell 1.
+    expect(cellAtPoint({ x: 141, y: 53 }, { x: 100, y: 50 }, 40, 4, 4)).toEqual({ x: 1, y: 0 });
+    expect(at(141, 53)).toEqual({ x: 0, y: 0 }); // content-edge origin gets it right
+  });
+
+  it('returns null outside the grid on all four sides', () => {
+    expect(at(102.9, 53)).toBeNull(); // just left of the content edge (inside the border)
+    expect(at(103, 52)).toBeNull();
+    expect(at(263.1, 53)).toBeNull(); // past the right content edge
+    expect(at(103, 213.1)).toBeNull();
   });
 });
