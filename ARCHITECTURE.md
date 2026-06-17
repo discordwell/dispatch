@@ -41,7 +41,7 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 | `src/state/store.ts` | holds GameState; subscribe/getState/advance/flush/update/reset | – |
 | `src/state/actions.ts` | intents: beginLoad / commitLoad / cancelLoad / reposition / bookNpc, splitNet, buildMilkRun + read selectors | – |
 | `src/state/progress.ts` | campaign progress (unlocks, best earnings) in localStorage; pure `applyResult` | – |
-| `src/engine/loop.ts` | rAF fixed-timestep accumulator | – |
+| `src/engine/loop.ts` | rAF driver + pure `planTicks` fixed-timestep accumulator | ◐ |
 | `src/render/MapRenderer.ts` | Canvas: city-map raster (+white knockout), multi-stop routes, docks, airships | – |
 | `src/render/paint.ts` | procedural brass/parchment/glow draw helpers | – |
 | `src/render/viewport.ts` | world↔screen transform; where a ship is drawn (fan-out at docks) | – |
@@ -67,9 +67,15 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 ## Time model
 
 `engine/loop.ts` runs `requestAnimationFrame` with a **fixed-timestep accumulator**
-(`config.TICK_HZ`). The simulation advances in fixed steps (deterministic, replayable,
-unit-testable); rendering interpolates. A single frame's `dt` is clamped to
-`config.MAX_FRAME_DT_MS` so a backgrounded tab doesn't mass-expire requests on return.
+(`config.TICK_HZ`). The accumulator decision — how many discrete steps a frame's elapsed time
+buys — is the pure, unit-tested `loop.planTicks` (the rAF wrapper only feeds it the clock and
+fans out `store.advance` calls). The simulation advances in fixed steps (deterministic,
+replayable); rendering reads the live, continuous sim state each frame (`MapRenderer` positions
+ships from `routeProgress` over `clockMs`, so it needs no per-frame interpolation — `planTicks`
+still exposes an `alpha` for a future interpolating renderer). Two guards live in `planTicks`: a
+single frame's `dt` is clamped to `config.MAX_FRAME_DT_MS` so a backgrounded tab doesn't
+mass-expire requests on return, and steps-per-frame are capped (spiral-of-death guard) with
+leftover time carried, never dropped.
 
 The level clock is **simulation time** counted inside `sim.step` (per-level `durationMs`, a tight
 2–6 min shift rising one minute per ace). Because
@@ -169,6 +175,10 @@ Caddyfile already `import`s `/etc/caddy/sites/*`. Hashed `assets/*` are cached i
 
 ## Testing
 
-Pure `core/` is unit-tested with Vitest in the `node` env (fast, no jsdom). The drag UI is
-verified by browser **wet testing** (per CLAUDE.md), not unit tests. Per "every fix requires a
-test", bug-prone geometry/packing math lives in pure tested functions.
+Pure `core/` is unit-tested with Vitest in the `node` env (fast, no jsdom). Per "every fix
+requires a test", bug-prone geometry/packing math lives in pure tested functions — this extends
+past `core/` to the load-bearing math in the render/engine layers: `render/viewport.ts` (the
+world↔screen transforms behind every click + the `shipAnchor` fan-out), `ui/shapeGlyph.ts` (board
+glyph geometry), and `engine/loop.ts`'s `planTicks` accumulator (`startLoop` itself is exercised
+with a stubbed rAF). The drag UI — pointer drag/rotate/flip in the packing overlay — remains
+verified by browser **wet testing** (per CLAUDE.md), not unit tests.
