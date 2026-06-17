@@ -37,7 +37,7 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 | `src/core/requestGen.ts` | seeded request schedule from LevelConfig | ✓ |
 | `src/core/sim.ts` | `step(state, dtMs)`: movement, stop resolution, spawn/expiry, money, win/lose; charter market | ✓ |
 | `src/core/setup.ts` | `createGameState(levelIndex)` — fresh deterministic state | ✓ |
-| `src/core/autopack.ts` | greedy first-fit packer for tests + balance runs (not a player feature) | ✓ |
+| `src/core/autopack.ts` | greedy first-fit packer for tests + balance runs (not a player feature); unit-tested for the validity invariant + largest-first/orientation heuristic | ✓ |
 | `src/state/store.ts` | holds GameState; subscribe/getState/advance/flush/update/reset | – |
 | `src/state/actions.ts` | intents: beginLoad / commitLoad / cancelLoad / reposition / bookNpc, splitNet, buildMilkRun + read selectors | – |
 | `src/state/progress.ts` | campaign progress (unlocks, best earnings) in localStorage; pure `applyResult` | – |
@@ -180,5 +180,9 @@ requires a test", bug-prone geometry/packing math lives in pure tested functions
 past `core/` to the load-bearing math in the render/engine layers: `render/viewport.ts` (the
 world↔screen transforms behind every click + the `shipAnchor` fan-out), `ui/shapeGlyph.ts` (board
 glyph geometry), and `engine/loop.ts`'s `planTicks` accumulator (`startLoop` itself is exercised
-with a stubbed rAF). The drag UI — pointer drag/rotate/flip in the packing overlay — remains
-verified by browser **wet testing** (per CLAUDE.md), not unit tests.
+with a stubbed rAF). It also covers `core/autopack.ts` — the greedy packer that underwrites the
+headless winnability proof and `measure-balance.ts`: its tests pin the **validity invariant**
+(every placement in-bounds + non-overlapping, the property `levels.test` silently depends on) plus
+the largest-first / use-rotation heuristic the balance tuning assumes. The drag UI — pointer
+drag/rotate/flip in the packing overlay — remains verified by browser **wet testing** (per
+CLAUDE.md), not unit tests.

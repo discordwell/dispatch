@@ -6,7 +6,7 @@
 **Status:** Live — full 5-level campaign on the **Zybourne City map** (dispatch between **docks**),
 with the **multi-load milk-run** (one hold carries several orders; auto-unload at each destination),
 multi-ship, NPC charters, audio/juice. Remaining work is playtest balance (§9).
-**Last updated:** 2026-05-30
+**Last updated:** 2026-06-17
 
 ---
 
@@ -86,9 +86,13 @@ high-value requests, and packing fast without leaving ships idle or letting requ
 ### 4.3 Your Fleet & Booking NPC Airships
 - **Owned fleet:** grows from **1 airship (level 1) → 5 airships (level 5).** Different hold
   sizes (see §4.4). Always available; you dispatch and pack them yourself.
-- **Booked NPC airships:** for-hire, **single delivery**, **fixed destination**, spawn
-  *near-but-not-adjacent* to a city (must fly in first). Costs a booking fee deducted from
-  payout. Lets you take on more than your fleet alone can carry — at a margin cost.
+- **Booked NPC ("contract") airships:** for-hire, **single trip**, spawn *near-but-not-adjacent*
+  to a dock (must fly in first). Cost is a **fixed hire fee by hull size** (Scout §350 / Hauler
+  §650 / Leviathan §1000), charged once on dispatch — *not* a percentage of the payout; the cargo
+  pays gross. So a charter only profits when you fill it on a multi-load, and a small load loses
+  money. The market posts a few demand docks at a time, each offering a random subset of sizes, so
+  you choose — but can't always get the hull you want. (Earlier design had a *fixed destination* +
+  a *% fee*; both were dropped — a charter now flies the same milk-run any ship would.)
 
 ### 4.4 Cargo Packing — the Core Puzzle
 - A hold is a **2D grid**. Hold sizes vary by airship, e.g.:
@@ -103,7 +107,7 @@ high-value requests, and packing fast without leaving ships idle or letting requ
   airships sit idle and rival requests expire.
 
 ### 4.5 Money & Scoring
-- Each delivered item pays its value; booking fees and (maybe) fuel are costs.
+- Each delivered item pays its value; a chartered hull's fixed hire fee is the only cost (no fuel).
 - Bonuses: packing efficiency, request complexity, possibly speed/combo streaks.
 - Level goal: **total earnings ≥ threshold** before the shift timer ends.
 
@@ -168,9 +172,10 @@ assets) · rotate **and** flip packing with a fill-% efficiency bonus, no auto-p
 tiers as data · multi-ship control · NPC charters · campaign progression + localStorage · audio.
 
 **Remaining (playtest tuning):**
-- **Thresholds** (L1 4500 / L2 9000 / L3 12000 / L4 15000 / L5 18000) were set from a
-  packing-time-aware estimator (≈ a rising % of the careful-play ceiling; charters add headroom).
-  Validate against real human-paced play; adjust spawn cadence / value-per-cell if a tier is off.
+- **Thresholds** are now **L1 700 / L2 1900 / L3 4500 / L4 7500 / L5 10500** over **2→6-min**
+  shifts, each ≈ 0.57–0.60× a careful multi-load run's take (measured by `measure-balance.ts`).
+  `tests/levels.test` guards that every tier stays winnable at that pace, so a future spawn/value
+  tweak that breaks balance fails CI. Still worth validating against real human-paced play.
 - **NPC charters** are simplified: a booked charter flies wherever the request goes (the original
   "fixed destination" framing was dropped for fun/clarity). Revisit if matching is desired.
 - Possible future: a tutorial hint on L1, more cargo/shape variety, leaderboards.
