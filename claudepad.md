@@ -7,6 +7,13 @@ Newest session summaries on top (keep 20; overflow → `oldpad.md`). Key Finding
 
 ## Session Summaries
 
+### 2026-06-17T04:00Z — Maintenance pass: pure-test the milk-run router + charter market
+- Autonomous maintenance pass (no user asks). Repo was already in great shape (94 tests green, clean typecheck/build, no live bugs found). Improvement targets the project's own convention — *"bug-prone geometry/packing math lives in pure tested functions"* — by extracting and testing the most complex previously-untested algorithm. **103 tests green** (was 94), typecheck + build clean. Committed locally only — **not pushed, not deployed** (orchestrator policy).
+- **Refactor — extract the milk-run router to pure tested geometry:** the nearest-neighbour stop ordering lived buried inside the non-exported `actions.buildMilkRun` and was only ever hit by 2-stop `commitLoad` tests whose destinations *tied* at equal distance, so the greedy choice itself was never exercised. Pulled it into pure, exported **`geometry.nearestNeighbourOrder(start, points, tieKey?)`** (greedy hop, `tieKey`-ascending then input-order tie-break, input untouched, O(n²)). `buildMilkRun` now calls it. **Behaviour-identical** — all prior tests incl. the routing-sensitive `levels`/balance run stayed green.
+- **Tests (+9):** `geometry.test` gains 4 NN cases — greedy ≠ distance-from-start sort (3 stops), deterministic tie-break independent of input order, default-tieKey input-order, empty/single/non-mutation; `actions.test` gains a 3-drop `commitLoad` that pins the greedy route end-to-end (`a→b→c`, which a naive distance-from-dock sort would mis-order to `a→c→b`); `npc.test` gains 4 `refreshNpcOffers` cases (enabled-seeds/disabled-clears, determinism per seed+bucket, distinct class-priced hulls at ≤`NPC_MARKET_DOCKS` real in-map docks with ≤`NPC_MAX_SIZES_PER_DOCK` distinct sizes each, demand-dock-only hosting). **Verified the discriminating tests bite:** temporarily reverting the router to a naive sort failed exactly the 2 greedy assertions, then restored.
+- **Docs:** fixed a stale permanent **Key Finding** (charters described as a "% fee off the gross" — they've been a *fixed* per-hull cost since 2026-05-30); refreshed the `ARCHITECTURE.md` geometry row + milk-run note to name the new helper.
+- **/code-review (multi-agent):** correctness pass fuzzed 500k inputs → the extracted router is byte-identical to the old inline sort/shift loop (the lone semantic delta, `localeCompare`→`tieKey` `<`, is inert: all city ids are lowercase kebab-case where the two agree, and no real route ever ties). Test pass caught one real weakness — the charter-market roster under the original seed 777 gave every dock a single hull, so the "distinct sizes per dock" check was vacuously `1===1`; switched the builder to **seed 1** (yields a `[Hauler,Scout]` dock) and added an assertion that a multi-size dock actually exists, so the distinctness property is genuinely exercised.
+
 ### 2026-06-11T04:45Z — Maintenance pass: hit-test fixes, live overlay chips, dead code, README
 - Autonomous maintenance pass (no user asks). 94 tests green (was 81), typecheck + build clean. Committed locally only — **not pushed, not deployed** (orchestrator policy for this pass).
 - **Bug — `pickAt` picked the bottom-most overlapping ship:** MapRenderer draws ships in array order (last = topmost) but the picker scanned forward and returned the first hit, so clicking two overlapped sprites (e.g. fanned idle ships 30px apart with 16px radii) selected the one drawn *underneath*. Now scans in reverse; new `tests/hitTest.test.ts` pins it (plus ship-over-city precedence + nearest-city cases).
@@ -122,5 +129,7 @@ Newest session summaries on top (keep 20; overflow → `oldpad.md`). Key Finding
 - **Sim clock is simulation-time** inside `sim.step` (fixed timestep), so it keeps running while
   the packing overlay (a DOM layer) is open — the intended pressure.
 - **Ship classes:** Scout 4×4, Hauler 5×6, Leviathan 6×8.
-- **Payout:** loaded value + `BONUS_MAX(0.5)·smoothstep(fill, FILL_FLOOR(0.5), 1)`; NPC ships pay
-  a fee fraction off the gross.
+- **Payout:** loaded value + `BONUS_MAX(0.5)·smoothstep(fill, FILL_FLOOR(0.5), 1)`, paid gross on
+  delivery. Charters are **not** a percentage fee — they cost a **fixed** `ShipClass.charterCost`
+  (Scout 350 / Hauler 650 / Leviathan 1000) charged once on dispatch, so a hull only profits on a
+  full multi-load (see `core/payout.ts`, `actions.commitLoad`).

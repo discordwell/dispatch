@@ -164,6 +164,29 @@ describe('commitLoad', () => {
     expect(ship.route!.stops.map((st) => st.cityId)).toEqual(['d', 'a']);
   });
 
+  it('orders three drops nearest-neighbour from the dock, not by raw distance from it', () => {
+    // Docks placed so greedy NN (a → b → c) differs from a naive distance-from-dock sort
+    // (a 30, c 40, b 60 → a, c, b). Pins the milk-run router through the public action.
+    const ship = haulerAt('d', 0, 0);
+    const s = baseState({
+      cities: [
+        { id: 'd', name: 'Dock', x: 0, y: 0 },
+        { id: 'a', name: 'A', x: 30, y: 0 },
+        { id: 'b', name: 'B', x: 60, y: 0 },
+        { id: 'c', name: 'C', x: 0, y: 40 },
+      ],
+      ships: [ship],
+      requests: [
+        activeReq('ra', 'd', 'a', [domino('ra_0')]),
+        activeReq('rb', 'd', 'b', [domino('rb_0')]),
+        activeReq('rc', 'd', 'c', [domino('rc_0')]),
+      ],
+    });
+    beginLoad(s, 'd', 's1');
+    expect(commitLoad(s, 's1', [place('ra_0', 0, 0), place('rb_0', 0, 2), place('rc_0', 0, 4)])).toBe(true);
+    expect(ship.route!.stops.map((st) => st.cityId)).toEqual(['a', 'b', 'c']);
+  });
+
   it('rejects empty, duplicate, foreign, and overlapping placements', () => {
     const mk = (): GameState => {
       const ship = haulerAt('d', 0, 0);

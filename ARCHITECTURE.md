@@ -30,7 +30,7 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 | `src/config.ts` | global tunables (tick rate, payout curve, speeds) | ✓ |
 | `src/core/types.ts` | domain interfaces (City [=dock], Airship, Route/RouteStop, CargoLot/Hold, DeliveryRequest, PolyominoItem, Placement, GameState, LevelConfig) | ✓ |
 | `src/core/rng.ts` | mulberry32 seeded PRNG | ✓ |
-| `src/core/geometry.ts` | distance, travelTimeMs, multi-stop polyline position | ✓ |
+| `src/core/geometry.ts` | distance, travelTimeMs, multi-stop polyline position, nearest-neighbour visiting order | ✓ |
 | `src/core/polyomino.ts` | rotate90 / flip / normalize / orientedCells / bbox | ✓ |
 | `src/core/packing.ts` | derived occupancy grid, canPlace, fillRatio, pieceAt | ✓ |
 | `src/core/payout.ts` | loaded value + efficiency (fill) bonus | ✓ |
@@ -124,7 +124,8 @@ reposition), or **removed** back to the manifest three ways — its ✕ badge, r
   docks at once — the raw material a multi-stop load batches. A `levels.test` guard pins the minimum
   lifetime so a future tweak can't quietly shrink windows back to where batching dies.
 - **Multi-stop route.** `buildMilkRun` orders the lots' distinct destinations nearest-neighbour from the
-  dock (deterministic tie-break), prepending a non-crediting **pickup stop** when the ship isn't already
+  dock via the pure, unit-tested `geometry.nearestNeighbourOrder` (greedy hop, deterministic id
+  tie-break), prepending a non-crediting **pickup stop** when the ship isn't already
   there (so any idle ship can load any dock, and charters fly in). `Route.stops[]` carries per-stop
   arrival times at one cruise speed, so a single `routeProgress` over the full `routePolyline` positions
   the ship. `sim.advanceStops` credits each stop reached this tick exactly once (auto-unloading the lots

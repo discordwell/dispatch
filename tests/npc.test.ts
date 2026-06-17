@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { step } from '../src/core/sim';
+import { step, refreshNpcOffers } from '../src/core/sim';
 import { createGameState } from '../src/core/setup';
 import { bookNpc, commitLoad } from '../src/state/actions';
 import { autoPack } from '../src/core/autopack';
 import { getShipClass } from '../src/data/ships';
+import { config } from '../src/config';
 import type { DeliveryRequest, GameState, LevelConfig, NpcOffer, PolyominoItem } from '../src/core/types';
 
 const cfg: LevelConfig = {
@@ -165,5 +166,97 @@ describe('npc charters', () => {
     expect(s.ships.some((sh) => sh.id === id1 && sh.status === 'flying')).toBe(true);
     step(s, 60_000);
     expect(s.requests.find((r) => r.id === 'r1')!.status).toBe('delivered');
+  });
+});
+
+describe('refreshNpcOffers (charter market generation)', () => {
+  function marketState(over: Partial<GameState> = {}): GameState {
+    return {
+      levelIndex: 1,
+      config: { ...cfg, npc: { enabled: true, spawnDistance: 120 } },
+      clockMs: 0,
+      earnings: 0,
+      cities: [
+        { id: 'a', name: 'A', x: 100, y: 100 },
+        { id: 'b', name: 'B', x: 300, y: 120 },
+        { id: 'c', name: 'C', x: 500, y: 300 },
+        { id: 'd', name: 'D', x: 220, y: 420 },
+        { id: 'e', name: 'E', x: 600, y: 500 },
+      ],
+      ships: [],
+      requests: [],
+      npcOffers: [],
+      nextNpcRefreshMs: 999_999,
+      outcome: 'playing',
+      seed: 1, // chosen so the roster posts a multi-size dock (else the distinctness check is vacuous)
+      seq: 0,
+      events: [],
+      ...over,
+    };
+  }
+
+  it('seeds a roster when enabled and clears it when disabled', () => {
+    const s = marketState();
+    refreshNpcOffers(s);
+    expect(s.npcOffers.length).toBeGreaterThan(0);
+    s.config = { ...s.config, npc: { enabled: false, spawnDistance: 120 } };
+    refreshNpcOffers(s);
+    expect(s.npcOffers).toEqual([]);
+  });
+
+  it('is deterministic for a given seed and time bucket', () => {
+    const a = marketState();
+    const b = marketState();
+    refreshNpcOffers(a);
+    refreshNpcOffers(b);
+    expect(a.npcOffers).toEqual(b.npcOffers);
+    expect(a.npcOffers.length).toBeGreaterThan(0);
+  });
+
+  it('offers distinct, class-priced hulls at a capped number of real docks, inside the map', () => {
+    const s = marketState();
+    refreshNpcOffers(s);
+    const offers = s.npcOffers;
+    expect(new Set(offers.map((o) => o.nearCityId)).size).toBeLessThanOrEqual(config.NPC_MARKET_DOCKS);
+    for (const o of offers) {
+      expect(s.cities.some((c) => c.id === o.nearCityId)).toBe(true);
+      expect(o.cost).toBe(getShipClass(o.shipClass).charterCost);
+      expect(o.holdW).toBe(getShipClass(o.shipClass).holdW);
+      expect(o.holdH).toBe(getShipClass(o.shipClass).holdH);
+      expect(o.spawn.x).toBeGreaterThanOrEqual(40);
+      expect(o.spawn.x).toBeLessThanOrEqual(config.MAP_W - 40);
+      expect(o.spawn.y).toBeGreaterThanOrEqual(40);
+      expect(o.spawn.y).toBeLessThanOrEqual(config.MAP_H - 40);
+    }
+    // each dock posts a DISTINCT subset of hull sizes, capped per dock
+    const byDock = new Map<string, string[]>();
+    for (const o of offers) byDock.set(o.nearCityId, [...(byDock.get(o.nearCityId) ?? []), o.shipClass]);
+    for (const classes of byDock.values()) {
+      expect(classes.length).toBeLessThanOrEqual(config.NPC_MAX_SIZES_PER_DOCK);
+      expect(new Set(classes).size).toBe(classes.length);
+    }
+    // and the seed must actually exercise a multi-size dock, or the distinctness check above is
+    // vacuous (every dock having one hull trivially satisfies it).
+    expect([...byDock.values()].some((classes) => classes.length >= 2)).toBe(true);
+  });
+
+  it('hosts the market only at docks with active demand when any exists', () => {
+    const s = marketState({
+      requests: [
+        {
+          id: 'r1',
+          originId: 'c',
+          destId: 'a',
+          items: [domino('r1_0')],
+          spawnAtMs: 0,
+          expiresAtMs: 999_999,
+          status: 'active',
+          baseReward: 100,
+        },
+      ],
+    });
+    refreshNpcOffers(s);
+    expect(s.npcOffers.length).toBeGreaterThan(0);
+    for (const o of s.npcOffers) expect(o.nearCityId).toBe('c'); // only 'c' has an active order
   });
 });

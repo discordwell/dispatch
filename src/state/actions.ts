@@ -1,5 +1,5 @@
 import { config } from '../config';
-import { cumulativeLengths, distance, travelTimeMs } from '../core/geometry';
+import { cumulativeLengths, distance, nearestNeighbourOrder, travelTimeMs } from '../core/geometry';
 import { buildOccupancy, fillRatio } from '../core/packing';
 import { computePayout, loadedValue } from '../core/payout';
 import { autoPack } from '../core/autopack';
@@ -201,17 +201,12 @@ function buildMilkRun(s: GameState, ship: Airship, dockId: string, lots: CargoLo
   const speed = Math.max(1, ship.owned ? base : base * config.CHARTER_SPEED_MULT);
   const dock = findCity(s, dockId);
 
-  // nearest-neighbour order the distinct destinations, starting from the dock
+  // nearest-neighbour order the distinct destinations, starting from the dock (where pickup
+  // happens), ties broken by id so the route — and thus balance — is deterministic.
   const destIds = [...new Set(lots.map((l) => l.destId))];
   const pool = destIds.map((id) => findCity(s, id)).filter((c): c is City => Boolean(c));
-  let cursor = dock ? { x: dock.x, y: dock.y } : from;
-  const orderedDests: City[] = [];
-  while (pool.length) {
-    pool.sort((a, b) => distance(cursor, a) - distance(cursor, b) || a.id.localeCompare(b.id));
-    const next = pool.shift()!;
-    orderedDests.push(next);
-    cursor = { x: next.x, y: next.y };
-  }
+  const start = dock ? { x: dock.x, y: dock.y } : from;
+  const orderedDests = nearestNeighbourOrder(start, pool, (c) => c.id);
 
   // deadhead pickup stop at the dock if the ship isn't sitting there already
   const atDock = !!dock && ship.locationId === dockId;

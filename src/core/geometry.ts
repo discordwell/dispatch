@@ -55,3 +55,31 @@ export function polylinePosition(pts: readonly Vec2[], t: number): Vec2 {
 export function routePolyline(from: Vec2, stops: readonly { pos: Vec2 }[]): Vec2[] {
   return [from, ...stops.map((s) => s.pos)];
 }
+
+/**
+ * Greedy nearest-neighbour visiting order over `points`, starting from `start`: repeatedly
+ * hop to the closest not-yet-visited point. Returns the points reordered (input untouched).
+ * Equal-distance ties are broken by `tieKey` ascending, then by input order, so the ordering
+ * is fully deterministic — the property the milk-run router relies on. O(n²), which is nothing
+ * for the handful of stops a route ever has. An empty / single-point input is returned as-is.
+ */
+export function nearestNeighbourOrder<T extends Vec2>(
+  start: Vec2,
+  points: readonly T[],
+  tieKey: (p: T) => string = () => '',
+): T[] {
+  const pool = points.slice();
+  const out: T[] = [];
+  let cursor: Vec2 = start;
+  while (pool.length) {
+    let best = 0;
+    for (let i = 1; i < pool.length; i++) {
+      const d = distance(cursor, pool[i]!) - distance(cursor, pool[best]!);
+      if (d < 0 || (d === 0 && tieKey(pool[i]!) < tieKey(pool[best]!))) best = i;
+    }
+    const next = pool.splice(best, 1)[0]!;
+    out.push(next);
+    cursor = next;
+  }
+  return out;
+}
