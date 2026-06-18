@@ -1,5 +1,6 @@
 import type { GameState } from '../core/types';
 import { summarizeShift } from '../core/score';
+import type { BestComparison } from '../state/progress';
 import { formatMoney } from './format';
 import { LOSE_LINES, WIN_LINES, pickLine } from './flavor';
 
@@ -12,6 +13,8 @@ export interface ResultCallbacks {
 export interface ResultOpts {
   hasNext: boolean;
   campaignComplete: boolean;
+  /** This shift vs. the level's standing record (computed against pre-shift progress). */
+  best: BestComparison;
 }
 
 /** End-of-shift result: win/lose (or full-campaign victory), the take, a flavor line, what next. */
@@ -20,6 +23,7 @@ export class ResultOverlay {
   private titleEl: HTMLElement;
   private subEl: HTMLElement;
   private statsEl: HTMLElement;
+  private bestEl: HTMLElement;
   private flavorEl: HTMLElement;
   private actionsEl: HTMLElement;
   private shown = false;
@@ -32,6 +36,7 @@ export class ResultOverlay {
         <div class="result-title"></div>
         <div class="result-sub"></div>
         <div class="result-stats"></div>
+        <div class="result-best"></div>
         <div class="result-flavor"></div>
         <div class="result-actions"></div>
       </div>`;
@@ -40,6 +45,7 @@ export class ResultOverlay {
     this.titleEl = el.querySelector('.result-title')!;
     this.subEl = el.querySelector('.result-sub')!;
     this.statsEl = el.querySelector('.result-stats')!;
+    this.bestEl = el.querySelector('.result-best')!;
     this.flavorEl = el.querySelector('.result-flavor')!;
     this.actionsEl = el.querySelector('.result-actions')!;
     this.actionsEl.addEventListener('click', (e) => {
@@ -81,6 +87,18 @@ export class ResultOverlay {
       chips.push(`<span class="stat"><b>${Math.round(sum.completionRate * 100)}%</b> on time</span>`);
     }
     this.statsEl.innerHTML = chips.join('');
+
+    // Personal best: celebrate beating the standing record, else show the bar to beat. On a
+    // first-ever finish there's no prior record to compare against (and the §take above already
+    // IS the new best), so the line stays empty (collapsed by `.result-best:empty`).
+    const { previous, improved } = opts.best;
+    this.bestEl.classList.toggle('new-best', improved && previous != null);
+    this.bestEl.innerHTML =
+      previous == null
+        ? ''
+        : improved
+          ? `★ New best <span class="prev">— beat ${formatMoney(previous)}</span>`
+          : `Best ${formatMoney(previous)}`;
 
     this.flavorEl.textContent = champ
       ? 'A shameful path led them to seek it… but you delivered. Johnny Five Aces tips his hat.'

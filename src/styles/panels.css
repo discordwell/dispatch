@@ -252,6 +252,25 @@
   color: var(--brass-0);
   margin-right: 3px;
 }
+/* personal-best line: a celebration when topped, else the standing record to beat */
+.result-best {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  color: var(--parch-ink-soft);
+}
+.result-best:empty {
+  display: none;
+}
+.result-best.new-best {
+  color: var(--brass-0);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.result-best .prev {
+  color: var(--parch-ink-soft);
+  font-weight: 400;
+}
 .result-flavor {
   margin: 16px 0 22px;
   font-style: italic;

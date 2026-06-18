@@ -14,12 +14,33 @@ export function emptyProgress(): Progress {
 /** Pure: fold a finished shift into progress (unlock next on a win, track best earnings). */
 export function applyResult(p: Progress, levelIndex: number, earnings: number, won: boolean): Progress {
   const best: Record<number, number> = { ...p.best };
-  best[levelIndex] = Math.max(best[levelIndex] ?? 0, earnings);
+  // Track the TRUE best, including a net loss (a charter's fixed fee can push a shift's earnings
+  // negative — intended). The identity for max is -Infinity, NOT 0: flooring at 0 would record a
+  // §0 "best" no player ever earned, then `compareToBest` would surface that phantom on replay.
+  best[levelIndex] = Math.max(best[levelIndex] ?? -Infinity, earnings);
   const highestUnlocked =
     won && levelIndex >= p.highestUnlocked && levelIndex < MAX_LEVEL
       ? Math.min(MAX_LEVEL, levelIndex + 1)
       : p.highestUnlocked;
   return { highestUnlocked, best };
+}
+
+/** How a finished shift stacks up against the level's standing record. */
+export interface BestComparison {
+  /** The level's best earnings before this shift, or null if the level was never finished before. */
+  previous: number | null;
+  /** This shift is the highest you've ever finished this level (a first-ever finish counts). */
+  improved: boolean;
+}
+
+/**
+ * Pure: compare a shift's earnings to the level's recorded best. Call this with the progress
+ * as it stood BEFORE the shift is folded in (i.e. before applyResult/recordResult), so a fresh
+ * `improved` reflects beating the *prior* record rather than the one this very shift just set.
+ */
+export function compareToBest(prior: Progress, levelIndex: number, earnings: number): BestComparison {
+  const previous = prior.best[levelIndex] ?? null;
+  return { previous, improved: earnings > (previous ?? -Infinity) };
 }
 
 export function loadProgress(): Progress {

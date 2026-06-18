@@ -4,7 +4,7 @@ import { createGameState } from '../core/setup';
 import { screenToWorld } from '../render/viewport';
 import { pickAt, type Pick } from '../render/hitTest';
 import { beginLoad, bookNpc, cancelLoad, commitLoad, idleShips, reposition } from '../state/actions';
-import { loadProgress, recordResult } from '../state/progress';
+import { compareToBest, loadProgress, recordResult, type BestComparison } from '../state/progress';
 import { initAudio, isMuted, resumeAudio, sfx, toggleMute } from '../audio';
 import type { GameState, Placement } from '../core/types';
 import { Hud } from './Hud';
@@ -30,6 +30,9 @@ export class GameUI {
   private title: TitleScreen;
   private begun = false; // false while the title screen is up (sim paused)
   private recorded = false; // guard so a finished shift is persisted once
+  // This shift vs. the level's standing record — captured against PRE-shift progress, the moment
+  // the shift ends (before recordResult folds it in), so the result screen can celebrate a new best.
+  private bestComparison: BestComparison = { previous: null, improved: false };
   private loading: { dockId: string; shipId: string } | null = null;
   private reposExpecting: string | null = null; // shipId awaiting a destination dock (Send-to-dock mode)
   private reposBanner: HTMLElement;
@@ -274,6 +277,8 @@ export class GameUI {
     if (s.outcome !== 'playing') {
       this.clearRepos();
       if (!this.recorded) {
+        // Compare against the record as it stood BEFORE this shift, then fold this shift in.
+        this.bestComparison = compareToBest(loadProgress(), s.levelIndex, s.earnings);
         recordResult(s.levelIndex, s.earnings, s.outcome === 'won');
         this.recorded = true;
         if (s.outcome === 'won') sfx.win();
@@ -285,6 +290,7 @@ export class GameUI {
       this.result.show(s, {
         hasNext: s.outcome === 'won' && s.levelIndex < MAX_LEVEL,
         campaignComplete: s.outcome === 'won' && s.levelIndex === MAX_LEVEL,
+        best: this.bestComparison,
       });
       return;
     }

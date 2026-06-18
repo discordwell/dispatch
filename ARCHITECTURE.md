@@ -41,7 +41,7 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 | `src/core/autopack.ts` | greedy first-fit packer for tests + balance runs (not a player feature); unit-tested for the validity invariant + largest-first/orientation heuristic | ✓ |
 | `src/state/store.ts` | holds GameState; subscribe/getState/advance/flush/update/reset | – |
 | `src/state/actions.ts` | intents: beginLoad / commitLoad / cancelLoad / reposition / bookNpc, splitNet, buildMilkRun + read selectors | – |
-| `src/state/progress.ts` | campaign progress (unlocks, best earnings) in localStorage; pure `applyResult` | – |
+| `src/state/progress.ts` | campaign progress (unlocks, best earnings) in localStorage; pure `applyResult` + `compareToBest` | – |
 | `src/engine/loop.ts` | rAF driver + pure `planTicks` fixed-timestep accumulator | ◐ |
 | `src/render/MapRenderer.ts` | Canvas: city-map raster (+white knockout), multi-stop routes, docks, airships | – |
 | `src/render/paint.ts` | procedural brass/parchment/glow draw helpers | – |
@@ -161,6 +161,13 @@ reposition), or **removed** back to the manifest three ways — its ✕ badge, r
   counts from each order's terminal status at the bell (no extra sim bookkeeping). The on-time chip
   (delivered ÷ resolved) is suppressed when no order reached a verdict, so it never reads "0%" on an
   empty board.
+- **Personal best:** under the debrief, `ResultOverlay` shows how the shift compares to the level's
+  standing record — *★ New best — beat §X* when topped, else the *Best §X* bar to beat — from the
+  pure, unit-tested `state/progress.compareToBest(prior, level, earnings)`. `GameUI` captures it
+  against the **pre-shift** progress (the moment the bell rings, before `recordResult` folds the run
+  in), so a new record is judged against the *prior* best, not the one this shift just set. A
+  first-ever finish shows no line (the §take above already is the new best). This closes the loop with
+  the level-select grid (`TitleScreen`), which lists the same per-level bests.
 - **Multi-ship:** `PackingOverlay` shows ship-selector chips; switching cancels the current
   reservation and re-reserves the chosen idle owned ship (`GameUI.switchShip`), re-keying the hold.
 - **Feedback channel:** `sim.step` appends transient `GameState.events` (`deliver`/`expire`);
