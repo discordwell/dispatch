@@ -233,6 +233,25 @@
   margin-top: 8px;
   font-size: 1rem;
 }
+/* post-shift debrief scorecard (delivered / expired / on-time) */
+.result-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--parch-ink-soft);
+}
+.result-stats:empty {
+  display: none;
+}
+.result-stats .stat b {
+  font-size: 1.05rem;
+  color: var(--brass-0);
+  margin-right: 3px;
+}
 .result-flavor {
   margin: 16px 0 22px;
   font-style: italic;

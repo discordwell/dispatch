@@ -34,6 +34,7 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 | `src/core/polyomino.ts` | rotate90 / flip / normalize / orientedCells / bbox | ✓ |
 | `src/core/packing.ts` | derived occupancy grid, canPlace, fillRatio, pieceAt | ✓ |
 | `src/core/payout.ts` | loaded value + efficiency (fill) bonus | ✓ |
+| `src/core/score.ts` | `summarizeShift` — post-shift debrief (delivered/expired/on-time) derived from final state | ✓ |
 | `src/core/requestGen.ts` | seeded request schedule from LevelConfig | ✓ |
 | `src/core/sim.ts` | `step(state, dtMs)`: movement, stop resolution, spawn/expiry, money, win/lose; charter market | ✓ |
 | `src/core/setup.ts` | `createGameState(levelIndex)` — fresh deterministic state | ✓ |
@@ -155,6 +156,11 @@ reposition), or **removed** back to the manifest three ways — its ✕ badge, r
   (win/lose, or a "Five Aces" campaign-complete variant). `state/progress.ts` persists unlocked
   tier + best earnings to `localStorage` (pure `applyResult` is unit-tested; load/save wrap it).
   The loop is gated by `GameUI.isRunning()` so sim time only advances during a shift.
+- **Shift debrief:** `ResultOverlay` shows a scorecard under the §take — *N delivered · M expired ·
+  X% on time* — from the pure, unit-tested `core/score.summarizeShift(state)`, which derives the
+  counts from each order's terminal status at the bell (no extra sim bookkeeping). The on-time chip
+  (delivered ÷ resolved) is suppressed when no order reached a verdict, so it never reads "0%" on an
+  empty board.
 - **Multi-ship:** `PackingOverlay` shows ship-selector chips; switching cancels the current
   reservation and re-reserves the chosen idle owned ship (`GameUI.switchShip`), re-keying the hold.
 - **Feedback channel:** `sim.step` appends transient `GameState.events` (`deliver`/`expire`);

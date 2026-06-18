@@ -1,4 +1,5 @@
 import type { GameState } from '../core/types';
+import { summarizeShift } from '../core/score';
 import { formatMoney } from './format';
 import { LOSE_LINES, WIN_LINES, pickLine } from './flavor';
 
@@ -18,6 +19,7 @@ export class ResultOverlay {
   readonly el: HTMLElement;
   private titleEl: HTMLElement;
   private subEl: HTMLElement;
+  private statsEl: HTMLElement;
   private flavorEl: HTMLElement;
   private actionsEl: HTMLElement;
   private shown = false;
@@ -29,6 +31,7 @@ export class ResultOverlay {
       <div class="result-card">
         <div class="result-title"></div>
         <div class="result-sub"></div>
+        <div class="result-stats"></div>
         <div class="result-flavor"></div>
         <div class="result-actions"></div>
       </div>`;
@@ -36,6 +39,7 @@ export class ResultOverlay {
     this.el = el;
     this.titleEl = el.querySelector('.result-title')!;
     this.subEl = el.querySelector('.result-sub')!;
+    this.statsEl = el.querySelector('.result-stats')!;
     this.flavorEl = el.querySelector('.result-flavor')!;
     this.actionsEl = el.querySelector('.result-actions')!;
     this.actionsEl.addEventListener('click', (e) => {
@@ -65,6 +69,19 @@ export class ResultOverlay {
       : won
         ? `You banked <b>${formatMoney(s.earnings)}</b> — clear of the ${formatMoney(s.config.threshold)} mark.`
         : `You banked <b>${formatMoney(s.earnings)}</b> — short of the ${formatMoney(s.config.threshold)} mark.`;
+    // Shift debrief: turn the bare §take into a readable scorecard. The third chip (on-time
+    // rate) appears only once some order has reached a verdict, so it never reads "0% on time"
+    // on an empty board.
+    const sum = summarizeShift(s);
+    const chips = [
+      `<span class="stat"><b>${sum.delivered}</b> delivered</span>`,
+      `<span class="stat"><b>${sum.expired}</b> expired</span>`,
+    ];
+    if (sum.delivered + sum.expired > 0) {
+      chips.push(`<span class="stat"><b>${Math.round(sum.completionRate * 100)}%</b> on time</span>`);
+    }
+    this.statsEl.innerHTML = chips.join('');
+
     this.flavorEl.textContent = champ
       ? 'A shameful path led them to seek it… but you delivered. Johnny Five Aces tips his hat.'
       : pickLine(won ? WIN_LINES : LOSE_LINES, s.earnings);

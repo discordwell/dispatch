@@ -110,6 +110,9 @@ high-value requests, and packing fast without leaving ships idle or letting requ
 - Each delivered item pays its value; a chartered hull's fixed hire fee is the only cost (no fuel).
 - Bonuses: packing efficiency, request complexity, possibly speed/combo streaks.
 - Level goal: **total earnings ≥ threshold** before the shift timer ends.
+- **End-of-shift debrief:** the result screen turns the bare §take into a scorecard —
+  *orders delivered · orders expired · on-time rate* — so a player can see *why* a shift went the
+  way it did (too slow → orders lapsing) rather than just whether the threshold was cleared.
 
 ### 4.6 Timer & Level Structure
 - Each level = a **2-to-6-minute** shift (2 min at one ace, +1 min per ace to 6 min at five aces).
