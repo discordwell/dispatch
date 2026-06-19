@@ -200,6 +200,10 @@ the largest-first / use-rotation heuristic the balance tuning assumes. `tests/sh
 the cargo library's data hygiene — every shape is a 4-connected polyomino with distinct,
 origin-normalized cells, its tier matches its size, and ids/labels/base orientations are unique —
 plus the invariant that the pentomino tiers cover **all twelve free pentominoes, each exactly once**
-(so a future addition can't silently duplicate a piece or leave a gap). The drag UI — pointer
+(so a future addition can't silently duplicate a piece or leave a gap). It also crosses the
+**shapes↔ships boundary** — guarding that every cargo shape fits *some* hull in at least one
+orientation (a piece no hold can fit is dead cargo: `autoPack` silently skips it and its value
+evaporates), and pinning that the 1×5 Drive Shaft is the lone piece a 4×4 Scout can't carry, so the
+"big cargo wants a big hull" wrinkle stays honest. The drag UI — pointer
 drag/rotate/flip in the packing overlay — remains verified by browser **wet testing** (per
 CLAUDE.md), not unit tests.

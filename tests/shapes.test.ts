@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SHAPES, getShapesForTiers, type ShapeDef } from '../src/data/shapes';
-import { cellsKey, normalize, orientedCells } from '../src/core/polyomino';
+import { boundingBox, cellsKey, normalize, orientedCells } from '../src/core/polyomino';
+import { SHIP_CLASSES, getShipClass } from '../src/data/ships';
 import type { Cell, Rotation } from '../src/core/types';
 
 /** Canonical key of a polyomino up to rotation + reflection (smallest over all 8 orientations). */
@@ -46,6 +47,17 @@ function cellCountOk(shape: ShapeDef): boolean {
   if (shape.tier === 1) return shape.cells.length === 2 || shape.cells.length === 3;
   if (shape.tier === 2) return shape.cells.length === 4;
   return shape.cells.length === 5; // tiers 3 & 4
+}
+
+/** Does some orientation (rotation × reflection) of `cells` fit within a holdW×holdH grid? */
+function fitsInHull(cells: readonly Cell[], holdW: number, holdH: number): boolean {
+  for (let r = 0 as Rotation; r < 4; r = (r + 1) as Rotation) {
+    for (const flipped of [false, true]) {
+      const bb = boundingBox(orientedCells(cells, r, flipped));
+      if (bb.w <= holdW && bb.h <= holdH) return true;
+    }
+  }
+  return false;
 }
 
 describe('shape library', () => {
@@ -148,5 +160,30 @@ describe('getShapesForTiers', () => {
 
   it('throws when no shapes match the requested tiers', () => {
     expect(() => getShapesForTiers([9])).toThrow();
+  });
+});
+
+describe('cargo fits the fleet', () => {
+  // Every order's cargo must be loadable onto *some* hull, or it's dead weight: autoPack
+  // silently skips a piece no hold can fit, so the order can never be fully loaded and its
+  // value just evaporates. These guards live across the shapes↔ships boundary (neither side
+  // tested it before) — what makes the new Drive Shaft's "needs a big hull" wrinkle safe.
+  const HULLS = Object.values(SHIP_CLASSES);
+
+  it('every cargo shape fits in at least one ship hull', () => {
+    for (const s of SHAPES) {
+      const carrier = HULLS.find((h) => fitsInHull(s.cells, h.holdW, h.holdH));
+      const fleet = HULLS.map((h) => `${h.name} ${h.holdW}×${h.holdH}`).join(', ');
+      expect(carrier, `${s.id} fits no hull in the fleet (${fleet})`).toBeDefined();
+    }
+  });
+
+  it('only the Drive Shaft (I-pentomino) needs a hull bigger than the Scout', () => {
+    // Pins the design claim in shapes.ts: the 1×5 I-pentomino is the lone piece a 4×4 Scout
+    // can't carry. If a future shape quietly becomes Scout-incompatible — or the Drive Shaft
+    // quietly starts fitting — this trips, keeping the "big cargo wants a big hull" note honest.
+    const scout = getShipClass('Scout');
+    const tooBig = SHAPES.filter((s) => !fitsInHull(s.cells, scout.holdW, scout.holdH)).map((s) => s.id);
+    expect(tooBig).toEqual(['drive-shaft']);
   });
 });
