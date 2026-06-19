@@ -61,7 +61,7 @@ parameterized by `LevelConfig`, so "5 levels" is genuinely just data.
 | `src/audio.ts` | procedural WebAudio SFX (no assets), mute persisted | – |
 | `src/main.ts` | bootstrap: store + loop + renderer + GameUI; `__dispatch` debug handle | – |
 | `src/data/cities.ts` | dock catalog (a `City` models a dock; superset for all levels) | ✓ |
-| `src/data/shapes.ts` | polyomino library, tiered by difficulty | ✓ |
+| `src/data/shapes.ts` | polyomino library, tiered by difficulty (tiers 3–4 = all 12 free pentominoes) | ✓ |
 | `src/data/ships.ts` | ship classes (Scout 4×4, Hauler 5×6, Leviathan 6×8) + charter costs | ✓ |
 | `src/data/levels/*` | the five tuned `LevelConfig`s (difficulty is data, never code) | ✓ |
 
@@ -196,6 +196,10 @@ glyph geometry), and `engine/loop.ts`'s `planTicks` accumulator (`startLoop` its
 with a stubbed rAF). It also covers `core/autopack.ts` — the greedy packer that underwrites the
 headless winnability proof and `measure-balance.ts`: its tests pin the **validity invariant**
 (every placement in-bounds + non-overlapping, the property `levels.test` silently depends on) plus
-the largest-first / use-rotation heuristic the balance tuning assumes. The drag UI — pointer
+the largest-first / use-rotation heuristic the balance tuning assumes. `tests/shapes.test` guards
+the cargo library's data hygiene — every shape is a 4-connected polyomino with distinct,
+origin-normalized cells, its tier matches its size, and ids/labels/base orientations are unique —
+plus the invariant that the pentomino tiers cover **all twelve free pentominoes, each exactly once**
+(so a future addition can't silently duplicate a piece or leave a gap). The drag UI — pointer
 drag/rotate/flip in the packing overlay — remains verified by browser **wet testing** (per
 CLAUDE.md), not unit tests.

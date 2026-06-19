@@ -42,6 +42,12 @@ export const SHAPES: readonly ShapeDef[] = [
   { id: 'zigzag', label: 'Zigzag Manifold', tier: 4, cells: [C(0, 0), C(1, 0), C(1, 1), C(1, 2), C(2, 2)] },
   { id: 'escapement', label: 'Escapement', tier: 4, cells: [C(1, 0), C(2, 0), C(0, 1), C(1, 1), C(1, 2)] },
   { id: 'aether-cell', label: 'Aether Cell', tier: 4, cells: [C(0, 0), C(0, 1), C(1, 1), C(1, 2), C(2, 2)] },
+  // The I- and V-pentominoes — the two free pentominoes the library was missing, so the gnarly
+  // tier now spans all twelve (guarded by tests/shapes.test). The Drive Shaft (1×5 straight) needs
+  // a five-long run of cells, so it only fits a Hauler/Leviathan — a deliberate "big cargo wants a
+  // big hull" wrinkle for the late levels (tier 4 lives only in L4–L5, which fly those hulls).
+  { id: 'drive-shaft', label: 'Drive Shaft', tier: 4, cells: [C(0, 0), C(1, 0), C(2, 0), C(3, 0), C(4, 0)] },
+  { id: 'gantry-arm', label: 'Gantry Arm', tier: 4, cells: [C(0, 0), C(0, 1), C(0, 2), C(1, 2), C(2, 2)] },
 ] as const;
 
 export function getShapesForTiers(tiers: readonly number[]): ShapeDef[] {

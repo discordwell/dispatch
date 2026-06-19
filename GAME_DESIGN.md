@@ -6,7 +6,7 @@
 **Status:** Live — full 5-level campaign on the **Zybourne City map** (dispatch between **docks**),
 with the **multi-load milk-run** (one hold carries several orders; auto-unload at each destination),
 multi-ship, NPC charters, audio/juice. Remaining work is playtest balance (§9).
-**Last updated:** 2026-06-17
+**Last updated:** 2026-06-18
 
 ---
 
@@ -175,10 +175,15 @@ assets) · rotate **and** flip packing with a fill-% efficiency bonus, no auto-p
 tiers as data · multi-ship control · NPC charters · campaign progression + localStorage · audio.
 
 **Remaining (playtest tuning):**
-- **Thresholds** are now **L1 700 / L2 1900 / L3 4500 / L4 7500 / L5 10500** over **2→6-min**
-  shifts, each ≈ 0.57–0.60× a careful multi-load run's take (measured by `measure-balance.ts`).
-  `tests/levels.test` guards that every tier stays winnable at that pace, so a future spawn/value
-  tweak that breaks balance fails CI. Still worth validating against real human-paced play.
+- **Thresholds** are **L1 700 / L2 1900 / L3 4500 / L4 7500 / L5 10500** over **2→6-min** shifts,
+  each ≈ 0.55–0.59× a careful multi-load run's take — careful ceilings ≈ **1232 / 3293 / 7694 /
+  13623 / 17830** (measured by `measure-balance.ts`). `tests/levels.test` guards that every tier
+  stays winnable at that pace, so a future spawn/value/shape tweak that breaks balance fails CI.
+  Still worth validating against real human-paced play.
 - **NPC charters** are simplified: a booked charter flies wherever the request goes (the original
   "fixed destination" framing was dropped for fun/clarity). Revisit if matching is desired.
-- Possible future: a tutorial hint on L1, more cargo/shape variety, leaderboards.
+- **Cargo variety:** the shape library now spans **all twelve free pentominoes** (the I- and
+  V-pentominoes were the gaps — added to the gnarly tier, so only L4–L5's deterministic schedules
+  shifted; L1–L3 are unchanged). The 1×5 I-piece ("Drive Shaft") only fits a Hauler/Leviathan — a
+  "big cargo wants a big hull" wrinkle in the late levels. Possible future: a tutorial hint on L1,
+  even-larger cargo (hexominoes), leaderboards.
